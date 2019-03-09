@@ -1,2 +1,4 @@
 # golin
-go download command
+
+A tool to create a symblic link for the GOROOT
+
