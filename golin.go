@@ -127,18 +127,12 @@ func getRoot() (string, error) {
 
 // Function getPath() is return GOPATH
 //
-// GOPATHの値を返しますが、現在GOPATHは存在しなくても
-// Goは動作しますので、存在しない場合はHOME/goを返します
+// GOPATHの値を返しますが、
+// 設定がない場合もあるのでos.Getenv()ではなく
+// go env からの値を取得
 //
 func getPath() string {
-	gopath := os.Getenv("GOPATH")
-	if gopath != "" {
-		return gopath
-	}
-
-	//Go Default gopath
-	home := os.Getenv("HOME")
-	return filepath.Join(home, "go")
+	return getGoEnv("GOPATH")
 }
 
 //
@@ -150,7 +144,7 @@ func getPath() string {
 // 変更する必要があります
 //
 func getSDK() string {
-	home := os.Getenv("HOME")
+	home := getHome()
 	if home == "" {
 		return ""
 	}
@@ -169,12 +163,12 @@ func goget() (string, error) {
 	link := fmt.Sprintf("%s/go%s", DownloadLink, pkgVersion)
 
 	cmd := exec.Command("go", "get", link)
-	err := cmdRun(cmd)
+	err := runCmd(cmd)
 	if err != nil {
 		return "", err
 	}
 
-	genCmd := fmt.Sprintf("go%s", pkgVersion)
+	genCmd := fmt.Sprintf("go%s%s", pkgVersion, getGoEnv("GOEXE"))
 	genPath := filepath.Join(getPath(), "bin", genCmd)
 	return genPath, nil
 }
@@ -187,7 +181,7 @@ func goget() (string, error) {
 //
 func download(bin string) (string, error) {
 	cmd := exec.Command(bin, "download")
-	err := cmdRun(cmd)
+	err := runCmd(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -214,8 +208,8 @@ func createLink(dir string) error {
 		return err
 	}
 
-	cmd := exec.Command("ln", "-ds", path, link)
-	if err := cmdRun(cmd); err != nil {
+	cmd := createLinkCmd(path, link)
+	if err := runCmd(cmd); err != nil {
 		return err
 	}
 
@@ -235,8 +229,8 @@ func createLink(dir string) error {
 func readyLink(dir string) (string, error) {
 	link := filepath.Join(dir, pkgLinkName)
 	if _, err := os.Lstat(link); err == nil {
-		cmd := exec.Command("rm", link)
-		if err := cmdRun(cmd); err != nil {
+		cmd := createRemoveCmd(link)
+		if err := runCmd(cmd); err != nil {
 			return "", err
 		}
 	} else {
@@ -272,11 +266,9 @@ func readyPath(dir string) (string, error) {
 		return "", err
 	}
 
-	fmt.Println("SDK=" + sdk)
-	fmt.Println("PATH=" + path)
 	//move
-	cmd := exec.Command("mv", sdk, path)
-	err = cmdRun(cmd)
+	cmd := createMoveCmd(sdk, path)
+	err = runCmd(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -284,12 +276,12 @@ func readyPath(dir string) (string, error) {
 }
 
 //
-// Function cmdRun() is command running
+// Function runCmd() is command running
 //
 // 実際コマンドを実行する処理
 // 標準出力等を一括管理する為に関数化を行った
 //
-func cmdRun(cmd *exec.Cmd) error {
+func runCmd(cmd *exec.Cmd) error {
 
 	cmd.Stdout = stdOut
 	cmd.Stderr = stdErr
@@ -298,4 +290,15 @@ func cmdRun(cmd *exec.Cmd) error {
 		return err
 	}
 	return nil
+}
+
+//
+// Function getGoEnv() is go env {key} command
+//
+func getGoEnv(key string) string {
+	out, err := exec.Command("go", "env", key).Output()
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }

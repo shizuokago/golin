@@ -111,3 +111,6 @@ func TestCmdRun(t *testing.T) {
 	}
 
 }
+
+func TestGoEnv(t *testing.T) {
+}
