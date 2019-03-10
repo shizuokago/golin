@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"os/exec"
 	"testing"
 )
@@ -32,6 +33,54 @@ func TestGetRoot(t *testing.T) {
 	}
 
 	//not found goroot
+
+}
+
+func TestGetPath(t *testing.T) {
+	path := getPath()
+	if path != "/home/secondarykey/go" {
+		t.Errorf("getPath() error[%s]", path)
+	}
+
+	//exist gopath
+}
+
+func TestGoGet(t *testing.T) {
+
+	pkgVersion = "1.9"
+	cmd, err := goget()
+	if err != nil {
+		t.Errorf("goget() error[%v]", err)
+	}
+
+	_, err = os.Stat(cmd)
+	if err != nil {
+		t.Errorf("Stats Error[%v]", err)
+	}
+
+	os.Remove(cmd)
+}
+
+func TestDownload(t *testing.T) {
+
+	pkgVersion = "1.9"
+	cmd, err := goget()
+	if err != nil {
+		t.Errorf("goget() error[%v]", err)
+	}
+
+	sdk, err := download(cmd)
+	if err != nil {
+		t.Errorf("download() error[%v]", err)
+	}
+
+	_, err = os.Stat(sdk)
+	if err != nil {
+		t.Errorf("not downloaded sdk[%s]", sdk)
+	}
+
+	os.Remove(cmd)
+	os.RemoveAll(sdk)
 
 }
 
