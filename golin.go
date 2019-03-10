@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,8 @@ const (
 var (
 	pkgVersion  string
 	pkgLinkName string
+	stdErr      io.Writer
+	stdOut      io.Writer
 )
 
 func main() {
@@ -23,8 +26,11 @@ func main() {
 	flag.Parse()
 
 	pkgLinkName = DefaultLinkName
+	stdOut = os.Stdout
+	stdErr = os.Stderr
 
 	args := flag.Args()
+
 	err := Run(args)
 	if err != nil {
 		fmt.Printf("Error:\n  %v\n", err)
@@ -74,14 +80,14 @@ func createLink(dir string) error {
 	path := filepath.Join(dir, pkgVersion)
 	link := filepath.Join(dir, pkgLinkName)
 
-	fmt.Println(link)
 	if _, err := os.Lstat(link); err == nil {
 		cmd := exec.Command("rm", link)
 		if err := cmdRun(cmd); err != nil {
 			return err
 		}
 	} else {
-		fmt.Println("lstat error." + err.Error())
+		//first run?
+		return err
 	}
 
 	cmd := exec.Command("ln", "-ds", path, link)
@@ -93,8 +99,9 @@ func createLink(dir string) error {
 }
 
 func cmdRun(cmd *exec.Cmd) error {
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+
+	cmd.Stdout = stdOut
+	cmd.Stderr = stdErr
 
 	if err := cmd.Run(); err != nil {
 		return err
