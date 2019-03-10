@@ -1,3 +1,17 @@
+//
+//Commad golin is Switching the symbolic link of GOROOT
+//
+//んなもんDockerでやりゃいい！という思いを跳ね除け、
+//Shizuoka.goの為に作りましたが、多分secondarykeyはそのままつかいます
+//https://github.com/shizuokago/golin で管理しています
+//
+//Reference
+//
+//versionが対象ディレクトリに存在しない場合、自動的にダウンロードを行い、
+//バージョンの切り替えを行ってくれます
+//
+//Windowsも対応予定です
+//
 package main
 
 import (
@@ -9,19 +23,30 @@ import (
 	"path/filepath"
 )
 
+//定数群
 const (
-	GoPrefix        = "go"
-	DefaultLinkName = "current"
-	DownloadLink    = "golang.org/dl"
+	GoPrefix        = "go"            //コマンドなどのPrefix
+	DefaultLinkName = "current"       //作成するリンク名
+	DownloadLink    = "golang.org/dl" //ダウンロード時のリンク先
 )
 
+// パッケージ内で使用する変数
+// 引数で渡すのも考えたけど。だるいので変数化した
+// Run()の挙動が変わるのでOptionとして構造体化するべきかも
 var (
-	pkgVersion  string
-	pkgLinkName string
-	stdErr      io.Writer
-	stdOut      io.Writer
+	pkgVersion  string    //切替対象のバージョン
+	pkgLinkName string    //リンク名
+	stdErr      io.Writer //エラー時の出力場所
+	stdOut      io.Writer //出力場所
 )
 
+//
+// This command main()
+//
+// コマンド実行時の初期処理です
+// flag指定がない為、現状はDefaultLinkName でリンクを作成
+// 標準出力、標準エラーはそのままosの値を設定しています
+//
 func main() {
 
 	flag.Parse()
@@ -42,6 +67,13 @@ func main() {
 	os.Exit(0)
 }
 
+//
+// Function Run is Command Controller
+//
+// args[0]に指定バージョンがあり、大域変数である
+// pkgLinkName,stdOut,stdErrに設定を行って呼び出します
+// pkgLinkNameは後日flag指定の予定です
+//
 func Run(args []string) error {
 
 	if len(args) != 1 {
@@ -62,10 +94,27 @@ func Run(args []string) error {
 	return createLink(root)
 }
 
+//
+// Function checkVersion is Version Check
+//
+// 現状はバージョン指定のチェックを行っていませんが、
+// X.xx.xx形式をチェック仕様かと思っています
+// ただし、BetaやReleaseCandidateがあるので
+// Semantic versioningだけのチェックは適用できない
+//
+// TODO(secondarykey) : Not yet implemented
+//
 func checkVersion() bool {
 	return true
 }
 
+//
+// Function getRoot() is return Work Directory Path
+//
+// この関数は処理対象のディレクトリを返します。
+// 具体的には現在のGOROOTの上の階層を返します。
+// GOROOTが存在しない場合はエラーとなります
+//
 func getRoot() (string, error) {
 
 	goroot := os.Getenv("GOROOT")
@@ -76,6 +125,11 @@ func getRoot() (string, error) {
 	return root, nil
 }
 
+// Function getPath() is return GOPATH
+//
+// GOPATHの値を返しますが、現在GOPATHは存在しなくても
+// Goは動作しますので、存在しない場合はHOME/goを返します
+//
 func getPath() string {
 	gopath := os.Getenv("GOPATH")
 	if gopath != "" {
@@ -87,6 +141,14 @@ func getPath() string {
 	return filepath.Join(home, "go")
 }
 
+//
+// Function getSDK() is return Download path
+//
+// golang.org/dl/goX.x.x のコマンドにdownloadした場合の
+// パスを作成して返します
+// golang.org/dl/internal/version.go の仕様が変更になった場合、
+// 変更する必要があります
+//
 func getSDK() string {
 	home := os.Getenv("HOME")
 	if home == "" {
@@ -95,6 +157,14 @@ func getSDK() string {
 	return filepath.Join(home, "sdk", "go"+pkgVersion)
 }
 
+//
+// Function goget() is downlod command download(go get)
+//
+// Goをダウンロードするコマンドである
+// golang.org/dl/goX.x.x をgo getして取得してきます
+// そのままGOPATHの位置でinstallされ、コマンドが作成されますので
+// そのコマンド名も返します
+//
 func goget() (string, error) {
 	link := fmt.Sprintf("%s/go%s", DownloadLink, pkgVersion)
 
@@ -109,6 +179,12 @@ func goget() (string, error) {
 	return genPath, nil
 }
 
+//
+// Function download() is Golang download
+//
+// 渡された引数を元にGo言語をダウンロードしてきます
+// 戻り値はダウンロードして来たディレクトリを返します
+//
 func download(bin string) (string, error) {
 	cmd := exec.Command(bin, "download")
 	err := cmdRun(cmd)
@@ -118,6 +194,14 @@ func download(bin string) (string, error) {
 	return getSDK(), nil
 }
 
+//
+// Function createLink() is create symboliclink
+//
+// 指定されたディレクトリにシンボリックリンクを作成します
+// readyPath() で指定したバージョンのGo言語の準備
+// readyLink() で指定したリンクの準備(削除) を行います
+// 最後にlnでシンボリックリンクを作成します
+//
 func createLink(dir string) error {
 
 	path, err := readyPath(dir)
@@ -138,6 +222,16 @@ func createLink(dir string) error {
 	return nil
 }
 
+//
+// Function readyLink() is remove symbolic link
+//
+// シンボリックリンクは存在する場合の
+// コマンドの動作が違うので削除を行っておきます
+// 現状初回起動時にシンボリックリンクがない場合に
+// 問い合わせしたりする処理がありません
+//
+// BUG(secondarykey): ロールバックがない
+//
 func readyLink(dir string) (string, error) {
 	link := filepath.Join(dir, pkgLinkName)
 	if _, err := os.Lstat(link); err == nil {
@@ -152,6 +246,13 @@ func readyLink(dir string) (string, error) {
 	return link, nil
 }
 
+//
+// Function readyPath() is golang version path
+//
+// 対象バージョンのパスを確認し、
+// 存在しない場合はダウンロードを行って準備する
+// 存在するバージョンの場合はそのままパスを返す
+//
 func readyPath(dir string) (string, error) {
 
 	path := filepath.Join(dir, pkgVersion)
@@ -182,6 +283,12 @@ func readyPath(dir string) (string, error) {
 	return path, nil
 }
 
+//
+// Function cmdRun() is command running
+//
+// 実際コマンドを実行する処理
+// 標準出力等を一括管理する為に関数化を行った
+//
 func cmdRun(cmd *exec.Cmd) error {
 
 	cmd.Stdout = stdOut
