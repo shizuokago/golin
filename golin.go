@@ -12,15 +12,19 @@
 //
 //Windowsも対応予定です
 //
+
 package main
 
 import (
 	"flag"
 	"fmt"
 	"io"
+	//"io/ioutil"
+	//"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 //定数群
@@ -208,8 +212,8 @@ func createLink(dir string) error {
 		return err
 	}
 
-	cmd := createLinkCmd(path, link)
-	if err := runCmd(cmd); err != nil {
+	err = os.Symlink(path, link)
+	if err != nil {
 		return err
 	}
 
@@ -229,10 +233,11 @@ func createLink(dir string) error {
 func readyLink(dir string) (string, error) {
 	link := filepath.Join(dir, pkgLinkName)
 	if _, err := os.Lstat(link); err == nil {
-		cmd := createRemoveCmd(link)
-		if err := runCmd(cmd); err != nil {
+		err = os.Remove(link)
+		if err != nil {
 			return "", err
 		}
+
 	} else {
 		//first run?
 		return "", err
@@ -266,9 +271,8 @@ func readyPath(dir string) (string, error) {
 		return "", err
 	}
 
-	//move
-	cmd := createMoveCmd(sdk, path)
-	err = runCmd(cmd)
+	//err = moveDirectory(sdk, path)
+	err = os.Rename(sdk+string(filepath.Separator), path+string(filepath.Separator))
 	if err != nil {
 		return "", err
 	}
@@ -300,5 +304,36 @@ func getGoEnv(key string) string {
 	if err != nil {
 		return ""
 	}
-	return string(out)
+	return strings.ReplaceAll(string(out), "\n", "")
+}
+
+func moveDirectory(sdk, path string) error {
+
+	/*
+		os.Mkdir(path, 0777)
+		infos, err := ioutil.ReadDir(sdk)
+		if err != nil {
+			return err
+		}
+
+		for _, info := range infos {
+			oldF := filepath.Join(sdk, info.Name())
+			newF := filepath.Join(path, info.Name())
+			log.Println("old:" + oldF)
+			log.Println("new:" + newF)
+			if info.IsDir() {
+				err = moveDirectory(oldF, newF)
+				if err != nil {
+					return err
+				}
+			} else {
+				err = os.Rename(oldF, newF)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+	*/
+	return nil
 }

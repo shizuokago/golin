@@ -1,6 +1,6 @@
-package main
-
 // +build windows
+
+package main
 
 import (
 	"os"
@@ -11,7 +11,7 @@ import (
 // Function getHome() is HOME directory
 //
 func getHome() string {
-	home := os.Getenv("HOME")
+	home := os.Getenv("USERPROFILE")
 	return home
 }
 
