@@ -1,10 +1,9 @@
 // +build !windows
 
-package main
+package golin
 
 import (
 	"os"
-	"os/exec"
 )
 
 //

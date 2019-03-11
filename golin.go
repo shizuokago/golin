@@ -13,10 +13,9 @@
 //Windowsも対応予定です
 //
 
-package main
+package golin
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -27,46 +26,47 @@ import (
 
 //定数群
 const (
-	GoPrefix        = "go"            //コマンドなどのPrefix
-	DefaultLinkName = "current"       //作成するリンク名
-	DownloadLink    = "golang.org/dl" //ダウンロード時のリンク先
+	goPrefix        = "go"            //コマンドなどのPrefix
+	defaultLinkName = "current"       //作成するリンク名
+	downloadLink    = "golang.org/dl" //ダウンロード時のリンク先
 )
 
-// パッケージ内で使用する変数
-// 引数で渡すのも考えたけど。だるいので変数化した
-// Run()の挙動が変わるのでOptionとして構造体化するべきかも
-var (
-	pkgVersion  string    //切替対象のバージョン
-	pkgLinkName string    //リンク名
-	stdErr      io.Writer //エラー時の出力場所
-	stdOut      io.Writer //出力場所
+//特殊引数
+//
+// list でダウンロードできるバージョンのリストを表示
+// development で最新の開発バージョンを取得D
+//
+// TODO(secondarykey) : Not yet Implemented
+//
+const (
+	DownloadList = "list"
+	Development  = "development" //gotip
 )
 
-//
-// This command main()
-//
-// コマンド実行時の初期処理です
-// flag指定がない為、現状はDefaultLinkName でリンクを作成
-// 標準出力、標準エラーはそのままosの値を設定しています
-//
-func main() {
+//実行オプション
+type Option struct {
+	LinkName string    //リンク名
+	StdIn    io.Reader //エラー時の出力場所
+	StdErr   io.Writer //エラー時の出力場所
+	StdOut   io.Writer //出力場所
+}
 
-	flag.Parse()
+var option *Option
 
-	pkgLinkName = DefaultLinkName
-	stdOut = os.Stdout
-	stdErr = os.Stderr
+func SetOption(op *Option) {
+	option = op
+}
 
-	args := flag.Args()
-
-	err := Run(args)
-	if err != nil {
-		fmt.Printf("Error:\n  %v\n", err)
-		os.Exit(1)
+func getOption() *Option {
+	if option == nil {
+		option = &Option{
+			LinkName: defaultLinkName,
+			StdIn:    os.Stdin,
+			StdOut:   os.Stdout,
+			StdErr:   os.Stderr,
+		}
 	}
-
-	fmt.Println("Change current GOROOT")
-	os.Exit(0)
+	return option
 }
 
 //
@@ -76,16 +76,10 @@ func main() {
 // pkgLinkName,stdOut,stdErrに設定を行って呼び出します
 // pkgLinkNameは後日flag指定の予定です
 //
-func Run(args []string) error {
+func Run(v string) error {
 
-	if len(args) != 1 {
-		return fmt.Errorf("golin arguments required version")
-	}
-
-	pkgVersion = args[0]
-
-	if !checkVersion() {
-		return fmt.Errorf("this version not semantic version[%s]", pkgVersion)
+	if !checkVersion(v) {
+		return fmt.Errorf("this version not semantic version[%s]", v)
 	}
 
 	root, err := getRoot()
@@ -93,7 +87,22 @@ func Run(args []string) error {
 		return err
 	}
 
-	return createLink(root)
+	path, err := readyPath(root, v)
+	if err != nil {
+		return err
+	}
+
+	link, err := readyLink(root)
+	if err != nil {
+		return err
+	}
+
+	err = os.Symlink(path, link)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 //
@@ -106,7 +115,7 @@ func Run(args []string) error {
 //
 // TODO(secondarykey) : Not yet implemented
 //
-func checkVersion() bool {
+func checkVersion(v string) bool {
 	return true
 }
 
@@ -145,12 +154,12 @@ func getPath() string {
 // golang.org/dl/internal/version.go の仕様が変更になった場合、
 // 変更する必要があります
 //
-func getSDK() string {
+func getSDKPath(v string) string {
 	home := getHome()
 	if home == "" {
 		return ""
 	}
-	return filepath.Join(home, "sdk", "go"+pkgVersion)
+	return filepath.Join(home, "sdk", "go"+v)
 }
 
 //
@@ -161,16 +170,20 @@ func getSDK() string {
 // そのままGOPATHの位置でinstallされ、コマンドが作成されますので
 // そのコマンド名も返します
 //
-func goget() (string, error) {
-	link := fmt.Sprintf("%s/go%s", DownloadLink, pkgVersion)
+func goget(v string) (string, error) {
 
+	link := fmt.Sprintf("%s/go%s", downloadLink, v)
+
+	// go get golang.org/dl/go{version}
 	cmd := exec.Command("go", "get", link)
 	err := runCmd(cmd)
 	if err != nil {
 		return "", err
 	}
 
-	genCmd := fmt.Sprintf("go%s%s", pkgVersion, getGoEnv("GOEXE"))
+	//GOEXE windows excutable file extention
+	// go{version}{.exe}
+	genCmd := fmt.Sprintf("go%s%s", v, getGoEnv("GOEXE"))
 	genPath := filepath.Join(getPath(), "bin", genCmd)
 	return genPath, nil
 }
@@ -181,41 +194,15 @@ func goget() (string, error) {
 // 渡された引数を元にGo言語をダウンロードしてきます
 // 戻り値はダウンロードして来たディレクトリを返します
 //
-func download(bin string) (string, error) {
+func download(bin, v string) (string, error) {
+
+	// $GOPATH/bin/go{version}{.exe} download
 	cmd := exec.Command(bin, "download")
 	err := runCmd(cmd)
 	if err != nil {
 		return "", err
 	}
-	return getSDK(), nil
-}
-
-//
-// Function createLink() is create symboliclink
-//
-// 指定されたディレクトリにシンボリックリンクを作成します
-// readyPath() で指定したバージョンのGo言語の準備
-// readyLink() で指定したリンクの準備(削除) を行います
-// 最後にlnでシンボリックリンクを作成します
-//
-func createLink(dir string) error {
-
-	path, err := readyPath(dir)
-	if err != nil {
-		return err
-	}
-
-	link, err := readyLink(dir)
-	if err != nil {
-		return err
-	}
-
-	err = os.Symlink(path, link)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return getSDKPath(v), nil
 }
 
 //
@@ -229,7 +216,9 @@ func createLink(dir string) error {
 // BUG(secondarykey): ロールバックがない
 //
 func readyLink(dir string) (string, error) {
-	link := filepath.Join(dir, pkgLinkName)
+
+	link := filepath.Join(dir, getOption().LinkName)
+	//symbliclink
 	if _, err := os.Lstat(link); err == nil {
 		err = os.Remove(link)
 		if err != nil {
@@ -237,7 +226,6 @@ func readyLink(dir string) (string, error) {
 		}
 
 	} else {
-		//first run?
 		return "", err
 	}
 	return link, nil
@@ -250,26 +238,28 @@ func readyLink(dir string) (string, error) {
 // 存在しない場合はダウンロードを行って準備する
 // 存在するバージョンの場合はそのままパスを返す
 //
-func readyPath(dir string) (string, error) {
+func readyPath(dir, v string) (string, error) {
 
-	path := filepath.Join(dir, pkgVersion)
+	path := filepath.Join(dir, v)
 	_, err := os.Stat(path)
+	//Exist
 	if err == nil {
 		return path, nil
 	}
 
-	bin, err := goget()
+	bin, err := goget(v)
 	if err != nil {
 		return "", err
 	}
+	//delete exe file
 	defer os.Remove(bin)
 
-	sdk, err := download(bin)
+	//go download
+	sdk, err := download(bin, v)
 	if err != nil {
 		return "", err
 	}
 
-	//err = moveDirectory(sdk, path)
 	err = os.Rename(sdk+string(filepath.Separator), path+string(filepath.Separator))
 	if err != nil {
 		return "", err
@@ -285,8 +275,9 @@ func readyPath(dir string) (string, error) {
 //
 func runCmd(cmd *exec.Cmd) error {
 
-	cmd.Stdout = stdOut
-	cmd.Stderr = stdErr
+	op := getOption()
+	cmd.Stdout = op.StdOut
+	cmd.Stderr = op.StdErr
 
 	if err := cmd.Run(); err != nil {
 		return err
@@ -296,11 +287,12 @@ func runCmd(cmd *exec.Cmd) error {
 
 //
 // Function getGoEnv() is go env {key} command
+// TODO(secondarykey) : change replaceall
 //
 func getGoEnv(key string) string {
 	out, err := exec.Command("go", "env", key).Output()
 	if err != nil {
 		return ""
 	}
-	return strings.ReplaceAll(string(out), "\n", "")
+	return strings.Replace(string(out), "\n", "", -1)
 }
