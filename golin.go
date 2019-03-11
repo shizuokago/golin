@@ -19,8 +19,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	//"io/ioutil"
-	//"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -305,35 +303,4 @@ func getGoEnv(key string) string {
 		return ""
 	}
 	return strings.ReplaceAll(string(out), "\n", "")
-}
-
-func moveDirectory(sdk, path string) error {
-
-	/*
-		os.Mkdir(path, 0777)
-		infos, err := ioutil.ReadDir(sdk)
-		if err != nil {
-			return err
-		}
-
-		for _, info := range infos {
-			oldF := filepath.Join(sdk, info.Name())
-			newF := filepath.Join(path, info.Name())
-			log.Println("old:" + oldF)
-			log.Println("new:" + newF)
-			if info.IsDir() {
-				err = moveDirectory(oldF, newF)
-				if err != nil {
-					return err
-				}
-			} else {
-				err = os.Rename(oldF, newF)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-	*/
-	return nil
 }
