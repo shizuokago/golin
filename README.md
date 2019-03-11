@@ -2,10 +2,18 @@
 
 This command toggles the symbolic link of GOROOT
 
+```bash
+$ go get github.com/shizuokago/golin/cmd/golin
+```
+
+created $GOPATH/bin/golin
+
 # example
 
+GOROOT = /usr/local/go/current -> 1.11.4
+
 ```
-target -
+/usr/local/go/current -
        |-1.11rc1
        |-1.11.4
        |-current -> 1.11.4
@@ -16,7 +24,7 @@ $ golin 1.12
 ```
 
 ```
-target -
+/usr/local/go/current -
        |-1.11rc1
        |-1.11.4
        |-1.12
