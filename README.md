@@ -11,8 +11,8 @@ target -
        |-current -> 1.11.4
 ```
 
-```
-golin 1.12
+```bash
+$ golin 1.12
 ```
 
 ```
