@@ -1,116 +1,171 @@
-package golin
+package golin_test
 
 import (
+	"fmt"
 	"os"
-	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
+
+	"github.com/shizuokago/golin"
 )
 
-func TestRun(t *testing.T) {
+const testDir = "test_GOROOT"
 
-	pkgLinkName = "current"
-	args := []string{"1.12rc1"}
-	err := Run(args)
-	if err != nil {
-		t.Errorf("getRoot() Error")
+var workROOT string
+
+func TestMain(m *testing.M) {
+
+	work := filepath.Join(getHome(), testDir)
+	err := os.MkdirAll(work, 0777)
+	if err == nil {
+		workROOT = filepath.Join(work, "fake")
+
+		ret := m.Run()
+		err = os.RemoveAll(workROOT)
+		if err != nil {
+			fmt.Printf("remove directory error[%v]\n", testDir)
+		}
+		os.Exit(ret)
+	} else {
+		fmt.Printf("make directory error[%v]\n", testDir)
+		os.Exit(1)
 	}
 }
 
-func TestCheckVersion(t *testing.T) {
-	if !checkVersion() {
-		t.Errorf("version error[%s]", pkgVersion)
+func TestGoEnv(t *testing.T) {
+
+	goexe := golin.GetGoEnv("GOEXE")
+	val := ""
+	if runtime.GOOS == "windows" {
+		val = ".exe"
 	}
+
+	if goexe != val {
+		t.Errorf("GOEXE[%s] OS[%s]", goexe, runtime.GOOS)
+	}
+
+	//GOPATHはTestGoPathでテスト
 }
 
-func TestGetRoot(t *testing.T) {
+func TestGoPath(t *testing.T) {
 
-	root, err := getRoot()
-	if err != nil {
-		t.Errorf("getRoot() Error")
-	}
-	if root != "/usr/local/go" {
-		t.Errorf("getRoot() get error[%s]", root)
-	}
+	org := os.Getenv("GOPATH")
+	defer func(path string) {
+		os.Setenv("GOPATH", path)
+	}(org)
 
-	//not found goroot
-
-}
-
-func TestGetPath(t *testing.T) {
-	path := getPath()
-	if path != "/home/secondarykey/go" {
-		t.Errorf("getPath() error[%s]", path)
+	if org != "" {
+		gopath := golin.GetGoPath()
+		if org != gopath {
+			t.Errorf("GetGoPath error[%s] != [%s]", org, gopath)
+		}
+		err := os.Setenv("GOPATH", "")
+		if err != nil {
+			t.Logf("GOPATH set error")
+		}
 	}
 
-	//exist gopath
-}
+	path := golin.GetGoPath()
 
-func TestGoGet(t *testing.T) {
+	home := getHome()
 
-	pkgVersion = "1.9"
-	cmd, err := goget()
-	if err != nil {
-		t.Errorf("goget() error[%v]", err)
+	defPath := filepath.Join(home, "go")
+	if path != defPath {
+		t.Errorf("GetGoPath error[%s] != [%s]", path, defPath)
 	}
-
-	_, err = os.Stat(cmd)
-	if err != nil {
-		t.Errorf("Stats Error[%v]", err)
-	}
-
-	os.Remove(cmd)
 }
 
 func TestDownload(t *testing.T) {
 
-	pkgVersion = "1.9"
-	cmd, err := goget()
+	sdk, err := golin.Download("1.12")
 	if err != nil {
-		t.Errorf("goget() error[%v]", err)
+		t.Errorf("Download error[%v]", err)
 	}
 
-	sdk, err := download(cmd)
+	defer func(path string) {
+		os.RemoveAll(path)
+	}(sdk)
+
+	sdk, err = golin.Download("1.12")
 	if err != nil {
-		t.Errorf("download() error[%v]", err)
+		t.Errorf("Downloaded version error[%v]", err)
 	}
 
-	_, err = os.Stat(sdk)
-	if err != nil {
-		t.Errorf("not downloaded sdk[%s]", sdk)
-	}
+	//work -> GOROOT
 
-	os.Remove(cmd)
-	os.RemoveAll(sdk)
-
-}
-
-func TestCreateLink(t *testing.T) {
-	dir := "/usr/local/go"
-
-	pkgVersion = "1.8.1"
-	pkgLinkName = "current"
-
-	err := createLink(dir)
-	if err != nil {
-		t.Errorf("Error createLink()")
-	}
-}
-
-func TestCmdRun(t *testing.T) {
-
-	cmd := exec.Command("echo", "Hello")
-	err := cmdRun(cmd)
-	if err != nil {
-		t.Errorf("not runing echo command")
-	}
-
-	cmd = exec.Command("unknown", "Hello")
-	err = cmdRun(cmd)
+	sdk, err = golin.Download("1.7")
 	if err == nil {
-		t.Errorf("runing unknown command")
+		t.Errorf("not download version [1.7](%s)", sdk)
+	}
+}
+
+func TestCreate(t *testing.T) {
+
+	sdk, err := golin.Download("1.12")
+	if err != nil {
+		t.Errorf("Downloaded version error[%v]", err)
+	}
+
+	err = os.Rename(sdk+string(filepath.Separator), workROOT+string(filepath.Separator))
+	if err != nil {
+		t.Logf("Rename Error[%v]", err)
+	}
+
+	org := os.Getenv("GOROOT")
+	defer func(path string) {
+		err := os.Setenv("GOROOT", org)
+		if err != nil {
+			t.Logf("setenv error[%v]", err)
+		}
+	}(org)
+
+	err = os.Setenv("GOROOT", "")
+	if err != nil {
+		t.Logf("GOROOT set error")
+	}
+
+	err = golin.Create("1.12")
+	if err == nil {
+		t.Errorf("GOROOT setting not error")
+	}
+
+	err = os.Setenv("GOROOT", workROOT)
+	if err != nil {
+		t.Logf("GOROOT set error")
+	}
+
+	//op := golin.DefaultOption()
+	//op.StdIn = bytes.NewBuffer("N\n")
+	//golin.SetOption(op)
+
+	//Set Option Operation N
+	//Set Option Operation Y
+	err = golin.Create("1.12")
+	if err != nil {
+		t.Errorf("Create 1.12")
+	}
+
+	//switch
+	err = golin.Create("1.11")
+	if err != nil {
+		t.Errorf("Create 1.11")
+	}
+
+	//current change
+
+	//reswitch
+	err = golin.Create("1.12")
+	if err != nil {
+		t.Errorf("Create 1.12")
 	}
 
 }
 
-func TestGoEnv(t *testing.T) {
+func getHome() string {
+	home := os.Getenv("HOME")
+	if runtime.GOOS == "windows" {
+		home = os.Getenv("USERPROFILE")
+	}
+	return home
 }

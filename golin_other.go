@@ -7,7 +7,9 @@ import (
 )
 
 //
-// Function getHome() is HOME directory
+// Function getHome is HOME directory
+//
+// 環境変数HOMEを返す
 //
 func getHome() string {
 	home := os.Getenv("HOME")

@@ -1,16 +1,12 @@
 //
-//Commad golin is Switching the symbolic link of GOROOT
+// Commad golin is Switching the symbolic link of GOROOT
 //
-//んなもんDockerでやりゃいい！という思いを跳ね除け、
-//Shizuoka.goの為に作りましたが、多分secondarykeyはそのままつかいます
-//https://github.com/shizuokago/golin で管理しています
+// んなもんDockerでやりゃいい！という思いを跳ね除け、
+// Shizuoka.goの為に作りましたが、多分secondarykeyはそのままつかいます
+// https://github.com/shizuokago/golin で管理しています
 //
-//Reference
-//
-//versionが対象ディレクトリに存在しない場合、自動的にダウンロードを行い、
-//バージョンの切り替えを行ってくれます
-//
-//Windowsも対応予定です
+// versionが対象ディレクトリに存在しない場合、自動的にダウンロードを行い、
+// バージョンの切り替えを行ってくれます
 //
 
 package golin
@@ -18,17 +14,18 @@ package golin
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
-//定数群
+//定数
 const (
-	goPrefix        = "go"            //コマンドなどのPrefix
 	defaultLinkName = "current"       //作成するリンク名
 	downloadLink    = "golang.org/dl" //ダウンロード時のリンク先
+	workDirectory   = "golin_work"
 )
 
 //特殊引数
@@ -53,36 +50,43 @@ type Option struct {
 
 var option *Option
 
+func DefaultOption() *Option {
+	return &Option{
+		LinkName: defaultLinkName,
+		StdIn:    os.Stdin,
+		StdOut:   os.Stdout,
+		StdErr:   os.Stderr,
+	}
+}
+
 func SetOption(op *Option) {
 	option = op
 }
 
 func getOption() *Option {
 	if option == nil {
-		option = &Option{
-			LinkName: defaultLinkName,
-			StdIn:    os.Stdin,
-			StdOut:   os.Stdout,
-			StdErr:   os.Stderr,
-		}
+		option = DefaultOption()
 	}
 	return option
 }
 
 //
-// Function Run is Command Controller
+// Create is create symblic link
 //
-// args[0]に指定バージョンがあり、大域変数である
-// pkgLinkName,stdOut,stdErrに設定を行って呼び出します
-// pkgLinkNameは後日flag指定の予定です
+// 引数でバージョンを指定します
+// GOROOTの確認、権限の確認、パスの準備、リンクの準備(削除)
+// リンクの張り直しを行います
 //
-func Run(v string) error {
+func Create(v string) error {
 
-	if !checkVersion(v) {
-		return fmt.Errorf("this version not semantic version[%s]", v)
-	}
+	printGoVersion("Before:")
 
 	root, err := getRoot()
+	if err != nil {
+		return err
+	}
+
+	err = checkAuthorization(root)
 	if err != nil {
 		return err
 	}
@@ -102,25 +106,60 @@ func Run(v string) error {
 		return err
 	}
 
+	printGoVersion("After :")
+
 	return nil
 }
 
 //
-// Function checkVersion is Version Check
+// checkAuthorization is authorization check
 //
-// 現状はバージョン指定のチェックを行っていませんが、
-// X.xx.xx形式をチェック仕様かと思っています
-// ただし、BetaやReleaseCandidateがあるので
-// Semantic versioningだけのチェックは適用できない
+// 引数のパスにリンクが貼れるかをワークでチェック
 //
-// TODO(secondarykey) : Not yet implemented
-//
-func checkVersion(v string) bool {
-	return true
+func checkAuthorization(path string) error {
+
+	work := filepath.Join(path, "."+workDirectory)
+	err := os.Mkdir(work, 0777)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(work)
+
+	link := filepath.Join(path, "_"+workDirectory+"_")
+	err = os.Symlink(work, link)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(link)
+
+	return nil
 }
 
 //
-// Function getRoot() is return Work Directory Path
+// checkVersion is Version Check
+//
+// バージョンのリストを作成し、
+// 指定バージョンがダウンロード可能かを確認
+//
+func checkVersion(v string) bool {
+
+	versionList, err := getVersionList()
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+
+	for _, ver := range versionList {
+		if ver == v {
+			return true
+		}
+	}
+
+	return false
+}
+
+//
+// Function getRoot is return Work Directory Path
 //
 // この関数は処理対象のディレクトリを返します。
 // 具体的には現在のGOROOTの上の階層を返します。
@@ -136,21 +175,20 @@ func getRoot() (string, error) {
 	return root, nil
 }
 
-// Function getPath() is return GOPATH
+//
+// GetGoPath is return GOPATH
 //
 // GOPATHの値を返しますが、
-// 設定がない場合もあるのでos.Getenv()ではなく
-// go env からの値を取得
+// 設定がない場合もあるのでos.Getenv()ではなくgo env からの値を取得
 //
-func getPath() string {
-	return getGoEnv("GOPATH")
+func GetGoPath() string {
+	return GetGoEnv("GOPATH")
 }
 
 //
-// Function getSDK() is return Download path
+// getSDKPath is return Downloaded path
 //
-// golang.org/dl/goX.x.x のコマンドにdownloadした場合の
-// パスを作成して返します
+// golang.org/dl/goX.x.x のコマンドにdownloadした場合のパスを作成して返します
 // golang.org/dl/internal/version.go の仕様が変更になった場合、
 // 変更する必要があります
 //
@@ -163,14 +201,50 @@ func getSDKPath(v string) string {
 }
 
 //
-// Function goget() is downlod command download(go get)
+// getVersionList is return Download list
+//
+// ダウンロードのリポジトリをgo getし、
+// ディレクトリ名からダウンロード可能なバージョンのリストを作成
+//
+func getVersionList() ([]string, error) {
+
+	// go get golang.org/dl/
+	cmd := exec.Command("go", "get", "-u", downloadLink)
+	// no go files error
+	runCmd(cmd)
+
+	dir := filepath.Join(GetGoPath(), "src", filepath.Clean(downloadLink))
+
+	infos, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	versionList := make([]string, 0, len(infos))
+	for _, info := range infos {
+		if !info.IsDir() {
+			continue
+		}
+
+		name := info.Name()
+		if name != "internal" && name != ".git" {
+			ver := strings.Replace(name, "go", "", -1)
+			versionList = append(versionList, ver)
+		}
+	}
+
+	return versionList, nil
+}
+
+//
+// createDownloadCmd is downlod command download(go get)
 //
 // Goをダウンロードするコマンドである
 // golang.org/dl/goX.x.x をgo getして取得してきます
 // そのままGOPATHの位置でinstallされ、コマンドが作成されますので
 // そのコマンド名も返します
 //
-func goget(v string) (string, error) {
+func createDownloadCmd(v string) (string, error) {
 
 	link := fmt.Sprintf("%s/go%s", downloadLink, v)
 
@@ -183,22 +257,30 @@ func goget(v string) (string, error) {
 
 	//GOEXE windows excutable file extention
 	// go{version}{.exe}
-	genCmd := fmt.Sprintf("go%s%s", v, getGoEnv("GOEXE"))
-	genPath := filepath.Join(getPath(), "bin", genCmd)
+	genCmd := fmt.Sprintf("go%s%s", v, GetGoEnv("GOEXE"))
+	genPath := filepath.Join(GetGoPath(), "bin", genCmd)
 	return genPath, nil
 }
 
 //
-// Function download() is Golang download
+// Download is Go download
 //
-// 渡された引数を元にGo言語をダウンロードしてきます
+// Go言語をダウンロードします
 // 戻り値はダウンロードして来たディレクトリを返します
 //
-func download(bin, v string) (string, error) {
+func Download(v string) (string, error) {
+
+	//$GOPATH/bin/go{version}{.exe}
+	bin, err := createDownloadCmd(v)
+	if err != nil {
+		return "", err
+	}
+	//delete exe file
+	defer os.Remove(bin)
 
 	// $GOPATH/bin/go{version}{.exe} download
 	cmd := exec.Command(bin, "download")
-	err := runCmd(cmd)
+	err = runCmd(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -206,14 +288,14 @@ func download(bin, v string) (string, error) {
 }
 
 //
-// Function readyLink() is remove symbolic link
+// readyLink is remove symbolic link
 //
 // シンボリックリンクは存在する場合の
 // コマンドの動作が違うので削除を行っておきます
 // 現状初回起動時にシンボリックリンクがない場合に
 // 問い合わせしたりする処理がありません
 //
-// BUG(secondarykey): ロールバックがない
+// BUG(secondarykey): 作成に失敗した場合のロールバックがない
 //
 func readyLink(dir string) (string, error) {
 
@@ -224,15 +306,15 @@ func readyLink(dir string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-
 	} else {
-		return "", err
+		// Confirm
+		//return "", err
 	}
 	return link, nil
 }
 
 //
-// Function readyPath() is golang version path
+// readyPath is golang version path
 //
 // 対象バージョンのパスを確認し、
 // 存在しない場合はダウンロードを行って準備する
@@ -247,19 +329,17 @@ func readyPath(dir, v string) (string, error) {
 		return path, nil
 	}
 
-	bin, err := goget(v)
-	if err != nil {
-		return "", err
+	if !checkVersion(v) {
+		return "", fmt.Errorf("this version not exist download version[%s]", v)
 	}
-	//delete exe file
-	defer os.Remove(bin)
 
 	//go download
-	sdk, err := download(bin, v)
+	sdk, err := Download(v)
 	if err != nil {
 		return "", err
 	}
 
+	//Download SDK Rename
 	err = os.Rename(sdk+string(filepath.Separator), path+string(filepath.Separator))
 	if err != nil {
 		return "", err
@@ -268,7 +348,7 @@ func readyPath(dir, v string) (string, error) {
 }
 
 //
-// Function runCmd() is command running
+// runCmd is command running
 //
 // 実際コマンドを実行する処理
 // 標準出力等を一括管理する為に関数化を行った
@@ -286,13 +366,33 @@ func runCmd(cmd *exec.Cmd) error {
 }
 
 //
-// Function getGoEnv() is go env {key} command
-// TODO(secondarykey) : change replaceall
+// GetGoEnv is go env {key} command
 //
-func getGoEnv(key string) string {
+// go envを引数で実行します
+//
+// TODO(secondarykey) : change replaceall(1.12 after,,,)
+//
+func GetGoEnv(key string) string {
 	out, err := exec.Command("go", "env", key).Output()
 	if err != nil {
 		return ""
 	}
 	return strings.Replace(string(out), "\n", "", -1)
+}
+
+//
+// printGoVersion is current go command version
+//
+// go versionを実行します
+//
+func printGoVersion(prefix string) {
+	out, err := exec.Command("go", "version").Output()
+	if err != nil {
+		return
+	}
+
+	ver := strings.Replace(string(out), "\n", "", -1)
+
+	op := getOption()
+	fmt.Fprintln(op.StdOut, prefix, ver)
 }

@@ -7,7 +7,9 @@ import (
 )
 
 //
-// Function getHome() is HOME directory
+// getHome is USERPROFILE directory
+//
+// WindowsのユーザHOMEであるUSERPROFILEのパスを返す
 //
 func getHome() string {
 	home := os.Getenv("USERPROFILE")
