@@ -17,7 +17,7 @@ import (
 const (
 	defaultLinkName = "current"       //作成するリンク名
 	downloadLink    = "golang.org/dl" //ダウンロード時のリンク先
-	workDirectory   = "golin_work"
+	workDirectory   = "golin_work"    //権限確認用のディレクトリ名
 )
 
 //特殊引数
@@ -111,6 +111,12 @@ func Create(v string) error {
 	return nil
 }
 
+//
+// printDownloadList is download list printing
+//
+// バージョンリストを元に並び替えを行い表示します
+// TODO(secondarykty) : 存在するディレクトリも表示する
+//
 func printDownloadList() error {
 	verList, err := getVersionList()
 	if err != nil {
@@ -225,7 +231,7 @@ func getSDKPath(v string) string {
 // ダウンロードのリポジトリをgo getし、
 // ディレクトリ名からダウンロード可能なバージョンのリストを作成
 //
-func getVersionList() ([]string, error) {
+func getVersionList() ([]*Version, error) {
 
 	// go get golang.org/dl/
 	cmd := exec.Command("go", "get", "-u", downloadLink)
@@ -238,7 +244,7 @@ func getVersionList() ([]string, error) {
 		return nil, err
 	}
 
-	versionList := make([]string, 0, len(infos))
+	versionList := make([]*Version, 0, len(infos))
 	for _, info := range infos {
 
 		if !info.IsDir() {
@@ -248,20 +254,19 @@ func getVersionList() ([]string, error) {
 		name := info.Name()
 		if name != "internal" && name != ".git" && name != "gotip" {
 			ver := strings.Replace(name, "go", "", -1)
-			versionList = append(versionList, ver)
+			versionList = append(versionList, NewVersion(ver))
 		}
 	}
 
 	sort.Slice(versionList, func(i, j int) bool {
-		ver_i := newVersion(versionList[i])
-		ver_j := newVersion(versionList[j])
-		return ver_i.less(ver_j)
+		return versionList[i].Less(versionList[j])
 	})
 
 	return versionList, nil
 }
 
-type version struct {
+//Version is r.v.m version
+type Version struct {
 	v    int
 	r    int
 	mean string
@@ -269,13 +274,12 @@ type version struct {
 	src  string
 }
 
-func newVersion(src string) *version {
+func NewVersion(src string) *Version {
 	v := &version{
 		mean: "major",
 		src:  src,
 	}
 	var err error
-
 	slice := strings.Split(src, ".")
 	if len(slice) > 0 {
 		v.v, err = strconv.Atoi(slice[0])
@@ -294,7 +298,7 @@ func newVersion(src string) *version {
 	return v
 }
 
-func (v *version) setRevision(r string) error {
+func (v *Version) setRevision(r string) error {
 	key := ""
 	if strings.Index(r, "beta") != -1 {
 		key = "beta"
@@ -322,7 +326,13 @@ func (v *version) setRevision(r string) error {
 	return err
 }
 
-func (src version) less(target *version) bool {
+func (src Version) Less(target *version) bool {
+
+	if src.mean == "error" {
+		return true
+	} else if target.mean == "error" {
+		return false
+	}
 
 	if src.v != target.v {
 		return src.v < target.v
