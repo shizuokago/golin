@@ -30,7 +30,5 @@ func main() {
 		fmt.Printf("Error:\n  %v\n", err)
 		os.Exit(1)
 	}
-
-	fmt.Println("Change current GOROOT")
 	os.Exit(0)
 }

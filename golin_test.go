@@ -107,6 +107,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("Downloaded version error[%v]", err)
 	}
 
+	//fakeの位置に移動
 	err = os.Rename(sdk+string(filepath.Separator), workROOT+string(filepath.Separator))
 	if err != nil {
 		t.Logf("Rename Error[%v]", err)
@@ -152,14 +153,73 @@ func TestCreate(t *testing.T) {
 		t.Errorf("Create 1.11")
 	}
 
-	//current change
-
 	//reswitch
 	err = golin.Create("1.12")
 	if err != nil {
 		t.Errorf("Create 1.12")
 	}
 
+}
+
+func ExampleRun_List() {
+	err := golin.Create("list")
+	if err != nil {
+	}
+
+	// Output:
+	//1.8beta1
+	//1.8beta2
+	//1.8rc1
+	//1.8rc2
+	//1.8rc3
+	//1.8
+	//1.8.1
+	//1.8.2
+	//1.8.3
+	//1.8.4
+	//1.8.5
+	//1.8.6
+	//1.8.7
+	//1.9beta1
+	//1.9beta2
+	//1.9rc1
+	//1.9rc2
+	//1.9
+	//1.9.1
+	//1.9.2
+	//1.9.3
+	//1.9.4
+	//1.9.5
+	//1.9.6
+	//1.9.7
+	//1.10beta1
+	//1.10beta2
+	//1.10rc1
+	//1.10rc2
+	//1.10
+	//1.10.1
+	//1.10.2
+	//1.10.3
+	//1.10.4
+	//1.10.5
+	//1.10.6
+	//1.10.7
+	//1.10.8
+	//1.11beta1
+	//1.11beta2
+	//1.11beta3
+	//1.11rc1
+	//1.11rc2
+	//1.11
+	//1.11.1
+	//1.11.2
+	//1.11.3
+	//1.11.4
+	//1.11.5
+	//1.12beta1
+	//1.12beta2
+	//1.12rc1
+	//1.12
 }
 
 func getHome() string {

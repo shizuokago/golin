@@ -1,23 +1,15 @@
-//
-// Commad golin is Switching the symbolic link of GOROOT
-//
-// んなもんDockerでやりゃいい！という思いを跳ね除け、
-// Shizuoka.goの為に作りましたが、多分secondarykeyはそのままつかいます
-// https://github.com/shizuokago/golin で管理しています
-//
-// versionが対象ディレクトリに存在しない場合、自動的にダウンロードを行い、
-// バージョンの切り替えを行ってくれます
-//
-
 package golin
 
 import (
 	"fmt"
+	"sort"
+
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -79,8 +71,16 @@ func getOption() *Option {
 //
 func Create(v string) error {
 
-	printGoVersion("Before:")
+	if v == DownloadList {
+		err := printDownloadList()
+		if err != nil {
+			return err
+		}
+		printGoVersion("Now:")
+		return nil
+	}
 
+	printGoVersion("Before:")
 	root, err := getRoot()
 	if err != nil {
 		return err
@@ -107,6 +107,25 @@ func Create(v string) error {
 	}
 
 	printGoVersion("After :")
+
+	return nil
+}
+
+func printDownloadList() error {
+	verList, err := getVersionList()
+	if err != nil {
+		return err
+	}
+	/*
+		root, err := getRoot()
+		if err != nil {
+			return err
+		}
+	*/
+
+	for _, ver := range verList {
+		fmt.Println(ver)
+	}
 
 	return nil
 }
@@ -214,7 +233,6 @@ func getVersionList() ([]string, error) {
 	runCmd(cmd)
 
 	dir := filepath.Join(GetGoPath(), "src", filepath.Clean(downloadLink))
-
 	infos, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -222,18 +240,115 @@ func getVersionList() ([]string, error) {
 
 	versionList := make([]string, 0, len(infos))
 	for _, info := range infos {
+
 		if !info.IsDir() {
 			continue
 		}
 
 		name := info.Name()
-		if name != "internal" && name != ".git" {
+		if name != "internal" && name != ".git" && name != "gotip" {
 			ver := strings.Replace(name, "go", "", -1)
 			versionList = append(versionList, ver)
 		}
 	}
 
+	sort.Slice(versionList, func(i, j int) bool {
+		ver_i := newVersion(versionList[i])
+		ver_j := newVersion(versionList[j])
+		return ver_i.less(ver_j)
+	})
+
 	return versionList, nil
+}
+
+type version struct {
+	v    int
+	r    int
+	mean string
+	m    int
+	src  string
+}
+
+func newVersion(src string) *version {
+	v := &version{
+		mean: "major",
+		src:  src,
+	}
+	var err error
+
+	slice := strings.Split(src, ".")
+	if len(slice) > 0 {
+		v.v, err = strconv.Atoi(slice[0])
+		if len(slice) > 1 && err == nil {
+			r := slice[1]
+			err = v.setRevision(r)
+			if len(slice) > 2 && err == nil {
+				v.m, err = strconv.Atoi(slice[2])
+			}
+		}
+	}
+
+	if err != nil {
+		v.mean = "error"
+	}
+	return v
+}
+
+func (v *version) setRevision(r string) error {
+	key := ""
+	if strings.Index(r, "beta") != -1 {
+		key = "beta"
+	} else if strings.Index(r, "rc") != -1 {
+		key = "rc"
+	}
+
+	var err error
+	if key == "" {
+		v.r, err = strconv.Atoi(r)
+	} else {
+		v.mean = key
+		slice := strings.Split(r, key)
+		if len(slice) == 2 {
+			v.r, err = strconv.Atoi(slice[0])
+			if err == nil {
+				v.m, err = strconv.Atoi(slice[1])
+			}
+		}
+	}
+
+	if err != nil {
+		v.mean = "error"
+	}
+	return err
+}
+
+func (src version) less(target *version) bool {
+
+	if src.v != target.v {
+		return src.v < target.v
+	}
+
+	if src.r != target.r {
+		return src.r < target.r
+	}
+
+	if src.mean != target.mean {
+
+		if src.mean == "beta" {
+			return true
+		} else if target.mean == "beta" {
+			return false
+		} else if src.mean == "rc" {
+			return true
+		} else if target.mean == "rc" {
+			return false
+		}
+
+	} else {
+		return src.m < target.m
+	}
+
+	return false
 }
 
 //
