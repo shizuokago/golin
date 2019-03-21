@@ -175,7 +175,7 @@ func checkVersion(v string) bool {
 	}
 
 	for _, ver := range versionList {
-		if ver == v {
+		if ver.src == v {
 			return true
 		}
 	}
@@ -275,7 +275,7 @@ type Version struct {
 }
 
 func NewVersion(src string) *Version {
-	v := &version{
+	v := &Version{
 		mean: "major",
 		src:  src,
 	}
@@ -326,7 +326,7 @@ func (v *Version) setRevision(r string) error {
 	return err
 }
 
-func (src Version) Less(target *version) bool {
+func (src Version) Less(target *Version) bool {
 
 	if src.mean == "error" {
 		return true
@@ -359,6 +359,10 @@ func (src Version) Less(target *version) bool {
 	}
 
 	return false
+}
+
+func (v Version) String() string {
+	return v.src
 }
 
 //

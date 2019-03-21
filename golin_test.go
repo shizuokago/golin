@@ -161,10 +161,14 @@ func TestCreate(t *testing.T) {
 
 }
 
+func TestVersion(t *testing.T) {
+}
+
+func BenchVersion(b *testing.B) {
+}
+
 func ExampleRun_List() {
-	err := golin.Create("list")
-	if err != nil {
-	}
+	golin.Create("list")
 
 	// Output:
 	//1.8beta1
