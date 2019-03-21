@@ -161,7 +161,7 @@ func TestCreate(t *testing.T) {
 
 }
 
-func ExampleRun_List() {
+func ExampleCreate() {
 	err := golin.Create("list")
 	if err != nil {
 	}

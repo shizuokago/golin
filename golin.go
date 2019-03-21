@@ -42,6 +42,12 @@ type Option struct {
 
 var option *Option
 
+//
+// DefaultOptoon is
+//
+//
+//
+//
 func DefaultOption() *Option {
 	return &Option{
 		LinkName: defaultLinkName,
@@ -51,6 +57,11 @@ func DefaultOption() *Option {
 	}
 }
 
+//
+// SetOption is
+//
+//
+//
 func SetOption(op *Option) {
 	option = op
 }
@@ -116,12 +127,6 @@ func printDownloadList() error {
 	if err != nil {
 		return err
 	}
-	/*
-		root, err := getRoot()
-		if err != nil {
-			return err
-		}
-	*/
 
 	for _, ver := range verList {
 		fmt.Println(ver)
@@ -225,6 +230,8 @@ func getSDKPath(v string) string {
 // ダウンロードのリポジトリをgo getし、
 // ディレクトリ名からダウンロード可能なバージョンのリストを作成
 //
+// TODO(secondarykey) : sudo時にgo getしてしまうと、キャシュ等で権限を奪われてしまう
+//
 func getVersionList() ([]string, error) {
 
 	// go get golang.org/dl/
@@ -232,7 +239,13 @@ func getVersionList() ([]string, error) {
 	// no go files error
 	runCmd(cmd)
 
-	dir := filepath.Join(GetGoPath(), "src", filepath.Clean(downloadLink))
+	dirDl := filepath.Join(GetGoPath(), "pkg", "mod", filepath.Clean(downloadLink)+"@v0.0.0*")
+	matches, err := filepath.Glob(dirDl)
+	if err != nil {
+		return nil, err
+	}
+	dir := matches[0]
+
 	infos, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
