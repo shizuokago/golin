@@ -1,3 +1,6 @@
+//Golin Command
+//
+//golin install command
 package main
 
 import (
@@ -13,7 +16,6 @@ import (
 //
 // コマンド実行時の初期処理です
 // 標準出力、標準エラーはそのままosの値を設定しています
-//
 //
 func main() {
 
@@ -31,4 +33,8 @@ func main() {
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+//Thid method is empty
+func Empty() {
 }
