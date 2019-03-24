@@ -2,13 +2,20 @@ package golin_test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/shizuokago/golin"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 const testDir = "test_GOROOT"
 
@@ -22,6 +29,7 @@ func TestMain(m *testing.M) {
 		workROOT = filepath.Join(work, "fake")
 
 		ret := m.Run()
+
 		err = os.RemoveAll(workROOT)
 		if err != nil {
 			fmt.Printf("remove directory error[%v]\n", testDir)
@@ -78,6 +86,10 @@ func TestGoPath(t *testing.T) {
 
 func TestDownload(t *testing.T) {
 
+	if testing.Short() {
+		t.Skip("skipping Download() test in short mode.")
+	}
+
 	sdk, err := golin.Download("1.12")
 	if err != nil {
 		t.Errorf("Download error[%v]", err)
@@ -101,6 +113,10 @@ func TestDownload(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
+
+	if testing.Short() {
+		t.Skip("skipping Create() test in short mode.")
+	}
 
 	sdk, err := golin.Download("1.12")
 	if err != nil {
@@ -162,72 +178,133 @@ func TestCreate(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
+
+	v11 := golin.NewVersion("1.11.6")
+	v12 := golin.NewVersion("1.12.1")
+
+	if v12.Less(v11) {
+		t.Errorf("Version parse error")
+	}
+
+	if !v11.Less(v12) {
+		t.Errorf("Version parse error")
+	}
+
 }
 
-func BenchVersion(b *testing.B) {
+func BenchmarkParseVersion(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		golin.NewVersion("1.12.1")
+		golin.NewVersion("1.12beta1")
+		golin.NewVersion("1.12rc1")
+		golin.NewVersion("1.12")
+		golin.NewVersion("2.0")
+	}
 }
 
-func ExampleCreate() {
+func randomVersion() string {
+
+	v := rand.Intn(3)
+	r := rand.Intn(20)
+	m := rand.Intn(10)
+
+	mean := rand.Intn(3)
+
+	buf := ""
+	switch mean {
+	case 0:
+		buf = "."
+	case 1:
+		buf = "rc"
+	case 2:
+		buf = "beta"
+	}
+
+	rtn := fmt.Sprintf("%d.%d%s%d", v, r, buf, m)
+	return rtn
+}
+
+func BenchmarkSortVersion(b *testing.B) {
+
+	versionList := make([]*golin.Version, 10000)
+	for i := 0; i < len(versionList); i++ {
+		v := golin.NewVersion(randomVersion())
+		versionList[i] = v
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sort.Slice(versionList, func(i, j int) bool {
+			return versionList[i].Less(versionList[j])
+		})
+	}
+}
+
+func ExampleCreate_list() {
 	err := golin.Create("list")
 	if err != nil {
 	}
 
 	// Output:
-	//1.8beta1
-	//1.8beta2
-	//1.8rc1
-	//1.8rc2
-	//1.8rc3
-	//1.8
-	//1.8.1
-	//1.8.2
-	//1.8.3
-	//1.8.4
-	//1.8.5
-	//1.8.6
-	//1.8.7
-	//1.9beta1
-	//1.9beta2
-	//1.9rc1
-	//1.9rc2
-	//1.9
-	//1.9.1
-	//1.9.2
-	//1.9.3
-	//1.9.4
-	//1.9.5
-	//1.9.6
-	//1.9.7
-	//1.10beta1
-	//1.10beta2
-	//1.10rc1
-	//1.10rc2
-	//1.10
-	//1.10.1
-	//1.10.2
-	//1.10.3
-	//1.10.4
-	//1.10.5
-	//1.10.6
-	//1.10.7
-	//1.10.8
-	//1.11beta1
-	//1.11beta2
-	//1.11beta3
-	//1.11rc1
-	//1.11rc2
-	//1.11
-	//1.11.1
-	//1.11.2
-	//1.11.3
-	//1.11.4
-	//1.11.5
-	//1.12beta1
-	//1.12beta2
-	//1.12rc1
-	//1.12
+	// 1.8beta1
+	// 1.8beta2
+	// 1.8rc1
+	// 1.8rc2
+	// 1.8rc3
+	// 1.8
+	// 1.8.1
+	// 1.8.2
+	// 1.8.3
+	// 1.8.4
+	// 1.8.5
+	// 1.8.6
+	// 1.8.7
+	// 1.9beta1
+	// 1.9beta2
+	// 1.9rc1
+	// 1.9rc2
+	// 1.9
+	// 1.9.1
+	// 1.9.2
+	// 1.9.3
+	// 1.9.4
+	// 1.9.5
+	// 1.9.6
+	// 1.9.7
+	// 1.10beta1
+	// 1.10beta2
+	// 1.10rc1
+	// 1.10rc2
+	// 1.10
+	// 1.10.1
+	// 1.10.2
+	// 1.10.3
+	// 1.10.4
+	// 1.10.5
+	// 1.10.6
+	// 1.10.7
+	// 1.10.8
+	// 1.11beta1
+	// 1.11beta2
+	// 1.11beta3
+	// 1.11rc1
+	// 1.11rc2
+	// 1.11
+	// 1.11.1
+	// 1.11.2
+	// 1.11.3
+	// 1.11.4
+	// 1.11.5
+	// 1.12beta1
+	// 1.12beta2
+	// 1.12rc1
+	// 1.12
+	// Now: go version go1.12 windows/amd64
+	//
 }
 
+// Test getHome()
+// ユーザディレクトリの取得のメソッド
 func getHome() string {
 	home := os.Getenv("HOME")
 	if runtime.GOOS == "windows" {
