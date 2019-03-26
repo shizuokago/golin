@@ -1,16 +1,17 @@
 package golin
 
 import (
+	"bufio"
 	"fmt"
-	"sort"
-
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //定数
@@ -82,16 +83,6 @@ func getOption() *Option {
 //
 func Create(v string) error {
 
-	if v == DownloadList {
-		err := printDownloadList()
-		if err != nil {
-			return err
-		}
-		printGoVersion("Now:")
-		return nil
-	}
-
-	printGoVersion("Before:")
 	root, err := getRoot()
 	if err != nil {
 		return err
@@ -101,6 +92,8 @@ func Create(v string) error {
 	if err != nil {
 		return err
 	}
+
+	printGoVersion("Before:")
 
 	path, err := readyPath(root, v)
 	if err != nil {
@@ -123,19 +116,20 @@ func Create(v string) error {
 }
 
 //
-// printDownloadList is download list printing
+// Print is download list printing
 //
 // バージョンリストを元に並び替えを行い表示します
 // TODO(secondarykty) : 存在するディレクトリも表示する
 //
-func printDownloadList() error {
+func Print() error {
 	verList, err := getVersionList()
 	if err != nil {
 		return err
 	}
 
 	for _, ver := range verList {
-		fmt.Println(ver)
+		op := getOption()
+		fmt.Fprintln(op.StdOut, ver)
 	}
 
 	return nil
@@ -166,29 +160,6 @@ func checkAuthorization(path string) error {
 }
 
 //
-// checkVersion is Version Check
-//
-// バージョンのリストを作成し、
-// 指定バージョンがダウンロード可能かを確認
-//
-func checkVersion(v string) bool {
-
-	versionList, err := getVersionList()
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-
-	for _, ver := range versionList {
-		if ver.src == v {
-			return true
-		}
-	}
-
-	return false
-}
-
-//
 // Function getRoot is return Work Directory Path
 //
 // この関数は処理対象のディレクトリを返します。
@@ -201,7 +172,35 @@ func getRoot() (string, error) {
 	if goroot == "" {
 		return "", fmt.Errorf("golin command required GOROOT environment variable.")
 	}
+
+	op := getOption()
 	root := filepath.Dir(goroot)
+
+	idx := strings.Index(goroot, op.LinkName)
+	if idx != len(goroot)-len(op.LinkName) {
+		fmt.Fprintf(op.StdOut, `
+This command creates the Go SDK within the current GOROOT parent directory. 
+It is recommended to specify a dedicated directory.
+
+%s -
+   |- [Download and create specified Go SDK]
+   |- 1.11.6
+   |- 1.12.1
+   |- %s  <- symbolic link that the creates.
+
+By changing the environment variable GOROOT to [%s], you can easily switch GOROOT.
+
+Is it OK?[Y/n] 
+`, root, op.LinkName, filepath.Join(root, op.LinkName))
+
+		stdin := bufio.NewScanner(op.StdIn)
+		stdin.Scan()
+		text := stdin.Text()
+		if text != "Y" {
+			return "", fmt.Errorf("Cancel.")
+		}
+	}
+
 	return root, nil
 }
 
@@ -246,12 +245,31 @@ func getVersionList() ([]*Version, error) {
 	// no go files error
 	runCmd(cmd)
 
-	dirDl := filepath.Join(GetGoPath(), "pkg", "mod", filepath.Clean(downloadLink)+"@v0.0.0*")
-	matches, err := filepath.Glob(dirDl)
-	if err != nil {
-		return nil, err
+	dir := ""
+	modules := os.Getenv("GO111MODULE")
+
+	if modules == "on" {
+		dirDl := filepath.Join(GetGoPath(), "pkg", "mod", filepath.Clean(downloadLink)+"@*")
+		matches, err := filepath.Glob(dirDl)
+		if err != nil {
+			return nil, err
+		}
+
+		t := time.Time{}.Unix()
+		for _, match := range matches {
+			info, err := os.Stat(match)
+			if err != nil {
+				return nil, err
+			}
+
+			if info.ModTime().Unix() > t {
+				dir = match
+				t = info.ModTime().Unix()
+			}
+		}
+	} else {
+		dir = filepath.Join(GetGoPath(), "src", filepath.Clean(downloadLink))
 	}
-	dir := matches[0]
 
 	infos, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -279,7 +297,7 @@ func getVersionList() ([]*Version, error) {
 	return versionList, nil
 }
 
-//Version is r.v.m version
+// Version is r.v.m version
 type Version struct {
 	v    int
 	r    int
@@ -288,6 +306,9 @@ type Version struct {
 	src  string
 }
 
+// Parse version string
+// src = "1.12.1" R,V,M
+// mean = major,rc,beta
 func NewVersion(src string) *Version {
 	v := &Version{
 		mean: "major",
@@ -312,6 +333,7 @@ func NewVersion(src string) *Version {
 	return v
 }
 
+// setRevision
 func (v *Version) setRevision(r string) error {
 	key := ""
 	if strings.Index(r, "beta") != -1 {
@@ -340,6 +362,7 @@ func (v *Version) setRevision(r string) error {
 	return err
 }
 
+// Version less
 func (src Version) Less(target *Version) bool {
 
 	if src.mean == "error" {
@@ -375,6 +398,7 @@ func (src Version) Less(target *Version) bool {
 	return false
 }
 
+// print source
 func (v Version) String() string {
 	return v.src
 }
@@ -442,7 +466,8 @@ func Download(v string) (string, error) {
 //
 func readyLink(dir string) (string, error) {
 
-	link := filepath.Join(dir, getOption().LinkName)
+	op := getOption()
+	link := filepath.Join(dir, op.LinkName)
 	//symbliclink
 	if _, err := os.Lstat(link); err == nil {
 		err = os.Remove(link)
@@ -450,8 +475,6 @@ func readyLink(dir string) (string, error) {
 			return "", err
 		}
 	} else {
-		// Confirm
-		//return "", err
 	}
 	return link, nil
 }
@@ -469,11 +492,15 @@ func readyPath(dir, v string) (string, error) {
 	_, err := os.Stat(path)
 	//Exist
 	if err == nil {
-		return path, nil
-	}
-
-	if !checkVersion(v) {
-		return "", fmt.Errorf("this version not exist download version[%s]", v)
+		if v == "tip" {
+			err := os.RemoveAll(path)
+			if err != nil {
+				//開発中実行がこのパスだった場合goを削除できないので無視
+				fmt.Fprintln(getOption().StdErr, err)
+			}
+		} else {
+			return path, nil
+		}
 	}
 
 	//go download
