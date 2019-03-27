@@ -1,6 +1,7 @@
 package golin_test
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
@@ -30,7 +31,7 @@ func TestMain(m *testing.M) {
 
 		ret := m.Run()
 
-		err = os.RemoveAll(workROOT)
+		err = os.RemoveAll(work)
 		if err != nil {
 			fmt.Printf("remove directory error[%v]\n", testDir)
 		}
@@ -131,7 +132,7 @@ func TestCreate(t *testing.T) {
 
 	org := os.Getenv("GOROOT")
 	defer func(path string) {
-		err := os.Setenv("GOROOT", org)
+		err := os.Setenv("GOROOT", path)
 		if err != nil {
 			t.Logf("setenv error[%v]", err)
 		}
@@ -142,52 +143,70 @@ func TestCreate(t *testing.T) {
 		t.Logf("GOROOT set error")
 	}
 
+	op := golin.DefaultOption()
+	op.StdIn = bytes.NewBufferString("Y\n")
 	err = golin.Create("1.12")
 	if err == nil {
 		t.Errorf("GOROOT setting not error")
 	}
 
+	t.Logf("Work GOROOT[%s]", workROOT)
 	err = os.Setenv("GOROOT", workROOT)
 	if err != nil {
 		t.Logf("GOROOT set error")
 	}
 
-	//op := golin.DefaultOption()
-	//op.StdIn = bytes.NewBuffer("N\n")
-	//golin.SetOption(op)
-
-	//Set Option Operation N
-	//Set Option Operation Y
+	op.StdIn = bytes.NewBufferString("Y\n")
+	golin.SetOption(op)
 	err = golin.Create("1.12")
 	if err != nil {
-		t.Errorf("Create 1.12")
+		t.Errorf("Create 1.12[%v]", err)
 	}
 
 	//switch
+	op.StdIn = bytes.NewBufferString("Y\n")
+	golin.SetOption(op)
 	err = golin.Create("1.11")
 	if err != nil {
-		t.Errorf("Create 1.11")
+		t.Errorf("Create 1.11[%v]", err)
 	}
 
 	//reswitch
+	op.StdIn = bytes.NewBufferString("Y\n")
+	golin.SetOption(op)
 	err = golin.Create("1.12")
 	if err != nil {
-		t.Errorf("Create 1.12")
+		t.Errorf("Create(exist) 1.12[%v]", err)
 	}
 
+	//Set Option Operation Y
 }
 
 func TestVersion(t *testing.T) {
 
-	v11 := golin.NewVersion("1.11.6")
-	v12 := golin.NewVersion("1.12.1")
+	v18 := golin.NewVersion("1.8")
+	v1110 := golin.NewVersion("1.11.0")
+	v1116 := golin.NewVersion("1.11.6")
+	v112 := golin.NewVersion("1.12.1")
+	v2 := golin.NewVersion("2.0beta1")
 
-	if v12.Less(v11) {
-		t.Errorf("Version parse error")
+	if !v18.Less(v1110) {
+		t.Errorf("Version less error. 1.8 < 1.11.0")
+	}
+	if !v18.Less(v2) {
+		t.Errorf("Version less error. 1.8 < 2.0")
 	}
 
-	if !v11.Less(v12) {
-		t.Errorf("Version parse error")
+	if v1116.Less(v1110) {
+		t.Errorf("Version less error. 1.11.6 > 1.11.0")
+	}
+
+	if !v1116.Less(v112) {
+		t.Errorf("Version less error. 1.11.6 < 1.12")
+	}
+
+	if !v112.Less(v2) {
+		t.Errorf("Version less error. 1.12 < 2.0")
 	}
 
 }
@@ -240,8 +259,9 @@ func BenchmarkSortVersion(b *testing.B) {
 	}
 }
 
-func ExampleCreate_list() {
-	err := golin.Create("list")
+func ExamplePrint() {
+
+	err := golin.Print()
 	if err != nil {
 	}
 
@@ -295,11 +315,12 @@ func ExampleCreate_list() {
 	// 1.11.3
 	// 1.11.4
 	// 1.11.5
+	// 1.11.6
 	// 1.12beta1
 	// 1.12beta2
 	// 1.12rc1
 	// 1.12
-	// Now: go version go1.12 windows/amd64
+	// 1.12.1
 	//
 }
 

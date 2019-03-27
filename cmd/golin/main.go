@@ -1,6 +1,4 @@
 //Golin Command
-//
-//golin install command
 package main
 
 import (
@@ -11,8 +9,12 @@ import (
 	"github.com/shizuokago/golin"
 )
 
+// golin設定用のオプション
 var op *golin.Option
 
+// Initialize golin command
+//
+// オプションに-dでリンク名を変更できるようにし、Usageを設定する
 func init() {
 	op = golin.DefaultOption()
 	flag.StringVar(&op.LinkName, "d", op.LinkName, "symbolic link name")
@@ -38,11 +40,17 @@ Usage of golin:
 	}
 }
 
+// 特殊引数
 //
-// This command main
+// list でダウンロードできるバージョンのリストを表示
+// development で最新の開発バージョンを取得
+const (
+	DownloadList = "list"
+	Development  = "development"
+)
+
 //
-// コマンド実行時の初期処理です
-// 標準出力、標準エラーはそのままosの値を設定しています
+// This golin command main
 //
 func main() {
 
@@ -58,10 +66,10 @@ func main() {
 	golin.SetOption(op)
 
 	switch arg {
-	case golin.DownloadList:
+	case DownloadList:
 		err = golin.Print()
-	case golin.Development:
-		err = golin.Create("tip")
+	case Development:
+		err = golin.CompileLatestSDK()
 	default:
 		err = golin.Create(arg)
 	}
@@ -71,8 +79,4 @@ func main() {
 		os.Exit(1)
 	}
 	os.Exit(0)
-}
-
-//Thid method is empty
-func Empty() {
 }

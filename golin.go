@@ -21,18 +21,6 @@ const (
 	workDirectory   = "golin_work"    //権限確認用のディレクトリ名
 )
 
-//特殊引数
-//
-// list でダウンロードできるバージョンのリストを表示
-// development で最新の開発バージョンを取得D
-//
-// TODO(secondarykey) : Not yet Implemented
-//
-const (
-	DownloadList = "list"
-	Development  = "development" //gotip
-)
-
 //実行オプション
 type Option struct {
 	LinkName string    //リンク名
@@ -44,9 +32,7 @@ type Option struct {
 var option *Option
 
 //
-// DefaultOptoon is
-//
-//
+// DefaultOptoon is golin option
 //
 //
 func DefaultOption() *Option {
@@ -81,9 +67,11 @@ func getOption() *Option {
 // GOROOTの確認、権限の確認、パスの準備、リンクの準備(削除)
 // リンクの張り直しを行います
 //
+// BUG(secondarykey): テストがGo1.12にしてないと通らない
+//
 func Create(v string) error {
 
-	root, err := getRoot()
+	root, err := getRoot(v)
 	if err != nil {
 		return err
 	}
@@ -116,6 +104,15 @@ func Create(v string) error {
 }
 
 //
+// CompileGoSDK is Compile from the latest repository to Create GoSDK
+//
+// Createに"tip"を渡すことで開発用のgotipの実行を行います
+//
+func CompileLatestSDK() error {
+	return Create("tip")
+}
+
+//
 // Print is download list printing
 //
 // バージョンリストを元に並び替えを行い表示します
@@ -127,9 +124,10 @@ func Print() error {
 		return err
 	}
 
+	//op := getOption()
 	for _, ver := range verList {
-		op := getOption()
-		fmt.Fprintln(op.StdOut, ver)
+		fmt.Println(ver)
+		//fmt.Fprintln(op.StdOut, ver)
 	}
 
 	return nil
@@ -166,7 +164,7 @@ func checkAuthorization(path string) error {
 // 具体的には現在のGOROOTの上の階層を返します。
 // GOROOTが存在しない場合はエラーとなります
 //
-func getRoot() (string, error) {
+func getRoot(ver string) (string, error) {
 
 	goroot := os.Getenv("GOROOT")
 	if goroot == "" {
@@ -175,24 +173,27 @@ func getRoot() (string, error) {
 
 	op := getOption()
 	root := filepath.Dir(goroot)
+	now := filepath.Base(goroot)
 
 	idx := strings.Index(goroot, op.LinkName)
+
+	//最後がリンク名と同一かを見る
 	if idx != len(goroot)-len(op.LinkName) {
 		fmt.Fprintf(op.StdOut, `
 This command creates the Go SDK within the current GOROOT parent directory. 
 It is recommended to specify a dedicated directory.
 
 %s -
-   |- [Download and create specified Go SDK]
-   |- 1.11.6
-   |- 1.12.1
-   |- %s  <- symbolic link that the creates.
+   |- %s
+   |- %s [Download specified Go SDK]
+   |- %s <- symbolic link that the creates.(Eval:%s)
 
 By changing the environment variable GOROOT to [%s], you can easily switch GOROOT.
 
 Is it OK?[Y/n] 
-`, root, op.LinkName, filepath.Join(root, op.LinkName))
+`, root, now, ver, op.LinkName, ver, filepath.Join(root, op.LinkName))
 
+		//入力受付
 		stdin := bufio.NewScanner(op.StdIn)
 		stdin.Scan()
 		text := stdin.Text()
@@ -242,13 +243,16 @@ func getVersionList() ([]*Version, error) {
 
 	// go get golang.org/dl/
 	cmd := exec.Command("go", "get", "-u", downloadLink)
+
 	// no go files error
 	runCmd(cmd)
 
 	dir := ""
 	modules := os.Getenv("GO111MODULE")
 
-	if modules == "on" {
+	if modules == "off" {
+		dir = filepath.Join(GetGoPath(), "src", filepath.Clean(downloadLink))
+	} else {
 		dirDl := filepath.Join(GetGoPath(), "pkg", "mod", filepath.Clean(downloadLink)+"@*")
 		matches, err := filepath.Glob(dirDl)
 		if err != nil {
@@ -267,8 +271,6 @@ func getVersionList() ([]*Version, error) {
 				t = info.ModTime().Unix()
 			}
 		}
-	} else {
-		dir = filepath.Join(GetGoPath(), "src", filepath.Clean(downloadLink))
 	}
 
 	infos, err := ioutil.ReadDir(dir)
