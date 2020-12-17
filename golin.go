@@ -3,16 +3,24 @@ package golin
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
+
+func Usage() string {
+	return `
+      golin version
+      golin install {path}
+      golin list
+
+      golin {version}
+    `
+}
 
 //定数
 const (
@@ -20,45 +28,6 @@ const (
 	downloadLink    = "golang.org/dl" //ダウンロード時のリンク先
 	workDirectory   = "golin_work"    //権限確認用のディレクトリ名
 )
-
-//実行オプション
-type Option struct {
-	LinkName string    //リンク名
-	StdIn    io.Reader //エラー時の出力場所
-	StdErr   io.Writer //エラー時の出力場所
-	StdOut   io.Writer //出力場所
-}
-
-var option *Option
-
-//
-// DefaultOptoon is golin option
-//
-//
-func DefaultOption() *Option {
-	return &Option{
-		LinkName: defaultLinkName,
-		StdIn:    os.Stdin,
-		StdOut:   os.Stdout,
-		StdErr:   os.Stderr,
-	}
-}
-
-//
-// SetOption is
-//
-//
-//
-func SetOption(op *Option) {
-	option = op
-}
-
-func getOption() *Option {
-	if option == nil {
-		option = DefaultOption()
-	}
-	return option
-}
 
 //
 // Create is create symblic link
@@ -116,7 +85,7 @@ func CompileLatestSDK() error {
 // Print is download list printing
 //
 // バージョンリストを元に並び替えを行い表示します
-// TODO(secondarykty) : 存在するディレクトリも表示する
+// 存在するバージョンには「*」を表示します
 //
 func Print() error {
 	verList, err := getVersionList()
@@ -124,10 +93,32 @@ func Print() error {
 		return err
 	}
 
+	parent := filepath.Dir(os.Getenv("GOROOT"))
+	gb := filepath.Join(parent, "*")
+
+	matches, err := filepath.Glob(gb)
+	if err != nil {
+		return err
+	}
+
+	exists := make([]string, len(matches))
+	for idx, ex := range matches {
+		wk := strings.Replace(ex, parent, "", 1)
+		exists[idx] = wk[1:]
+	}
+
 	//op := getOption()
 	for _, ver := range verList {
-		fmt.Println(ver)
-		//fmt.Fprintln(op.StdOut, ver)
+		v := ver.String()
+
+		for _, ex := range exists {
+			if ex == v {
+				v = v + strings.Repeat(" ", 20-len(v)) + "*"
+				break
+			}
+		}
+
+		fmt.Println(v)
 	}
 
 	return nil
@@ -237,7 +228,6 @@ func getSDKPath(v string) string {
 // ディレクトリ名からダウンロード可能なバージョンのリストを作成
 //
 // TODO(secondarykey) : sudo時にgo getしてしまうと、キャシュ等で権限を奪われてしまう
-// TODO(secondarykey) : GO111MODULE=off時はsrcを検索するべき
 //
 func getVersionList() ([]*Version, error) {
 
@@ -248,18 +238,23 @@ func getVersionList() ([]*Version, error) {
 	runCmd(cmd)
 
 	dir := ""
+	// Modulesの有無で判断
 	modules := os.Getenv("GO111MODULE")
 
 	if modules == "off" {
 		dir = filepath.Join(GetGoPath(), "src", filepath.Clean(downloadLink))
 	} else {
+
+		//pkg/mod内のすべてのパスを取得
 		dirDl := filepath.Join(GetGoPath(), "pkg", "mod", filepath.Clean(downloadLink)+"@*")
+
 		matches, err := filepath.Glob(dirDl)
 		if err != nil {
 			return nil, err
 		}
 
 		t := time.Time{}.Unix()
+		//最新のDirを設定
 		for _, match := range matches {
 			info, err := os.Stat(match)
 			if err != nil {
@@ -273,12 +268,14 @@ func getVersionList() ([]*Version, error) {
 		}
 	}
 
+	//ディレクトリを取得
 	infos, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 
 	versionList := make([]*Version, 0, len(infos))
+	//全バージョンを取得
 	for _, info := range infos {
 
 		if !info.IsDir() {
@@ -297,112 +294,6 @@ func getVersionList() ([]*Version, error) {
 	})
 
 	return versionList, nil
-}
-
-// Version is r.v.m version
-type Version struct {
-	v    int
-	r    int
-	mean string
-	m    int
-	src  string
-}
-
-// Parse version string
-// src = "1.12.1" R,V,M
-// mean = major,rc,beta
-func NewVersion(src string) *Version {
-	v := &Version{
-		mean: "major",
-		src:  src,
-	}
-	var err error
-	slice := strings.Split(src, ".")
-	if len(slice) > 0 {
-		v.v, err = strconv.Atoi(slice[0])
-		if len(slice) > 1 && err == nil {
-			r := slice[1]
-			err = v.setRevision(r)
-			if len(slice) > 2 && err == nil {
-				v.m, err = strconv.Atoi(slice[2])
-			}
-		}
-	}
-
-	if err != nil {
-		v.mean = "error"
-	}
-	return v
-}
-
-// setRevision
-func (v *Version) setRevision(r string) error {
-	key := ""
-	if strings.Index(r, "beta") != -1 {
-		key = "beta"
-	} else if strings.Index(r, "rc") != -1 {
-		key = "rc"
-	}
-
-	var err error
-	if key == "" {
-		v.r, err = strconv.Atoi(r)
-	} else {
-		v.mean = key
-		slice := strings.Split(r, key)
-		if len(slice) == 2 {
-			v.r, err = strconv.Atoi(slice[0])
-			if err == nil {
-				v.m, err = strconv.Atoi(slice[1])
-			}
-		}
-	}
-
-	if err != nil {
-		v.mean = "error"
-	}
-	return err
-}
-
-// Version less
-func (src Version) Less(target *Version) bool {
-
-	if src.mean == "error" {
-		return true
-	} else if target.mean == "error" {
-		return false
-	}
-
-	if src.v != target.v {
-		return src.v < target.v
-	}
-
-	if src.r != target.r {
-		return src.r < target.r
-	}
-
-	if src.mean != target.mean {
-
-		if src.mean == "beta" {
-			return true
-		} else if target.mean == "beta" {
-			return false
-		} else if src.mean == "rc" {
-			return true
-		} else if target.mean == "rc" {
-			return false
-		}
-
-	} else {
-		return src.m < target.m
-	}
-
-	return false
-}
-
-// print source
-func (v Version) String() string {
-	return v.src
 }
 
 //
@@ -447,12 +338,11 @@ func Download(v string) (string, error) {
 	//delete exe file
 	defer os.Remove(bin)
 
-	// $GOPATH/bin/go{version}{.exe} download
-	cmd := exec.Command(bin, "download")
-	err = runCmd(cmd)
+	err = runDownloadCmd(bin)
 	if err != nil {
 		return "", err
 	}
+
 	return getSDKPath(v), nil
 }
 
@@ -534,6 +424,38 @@ func runCmd(cmd *exec.Cmd) error {
 	if err := cmd.Run(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func runDownloadCmd(bin string) error {
+
+	fmt.Println("download cmd start")
+	// $GOPATH/bin/go{version}{.exe} download
+	cmd := exec.Command(bin, "download")
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Fprintln(os.Stdout, line)
+		}
+	}()
+
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("download cmd end")
 	return nil
 }
 
