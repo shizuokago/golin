@@ -5,6 +5,7 @@
 *.so
 *.dylib
 .*
+./_cmd/build/*
 
 # Test binary, build with `go test -c`
 *.test

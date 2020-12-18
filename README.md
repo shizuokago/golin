@@ -2,41 +2,62 @@
 
 This command swiching the symbolic link of GOROOT
 
-```bash
-$ go get github.com/shizuokago/golin/cmd/golin
+# install
+
+https://github.com/shizuokago/golin/releases
+
+Download the golin that suits your platform.
+
+# use
+
+If "go" command does not exit yet,"install"
+
+    $ golin install {path}
+
+this will install the latest Go on the "path".
+
+a symbolic link calld "current" is created in "path" with the latest version.
+
+    e.g) $ golin install /usr/local/go
+
+```
+/usr/local/go
+       |-1.15.6
+       |-current -> 1.15.6
 ```
 
-created $GOPATH/bin/golin
+you set the environment variable "GOROOT" to "/usr/local/go/current"
 
 # examples
 
-GOROOT = /usr/local/go/current -> 1.11.4
+GOROOT = /usr/local/go/current -> 1.15.6
 
 ```
 /usr/local/go/current -
-       |-1.11rc1
-       |-1.11.4
-       |-current -> 1.11.4
+       |-1.15.6
+       |-current -> 1.15.6
 ```
 
-```bash
-$ golin 1.12
-```
+    $ golin 1.16
 
 ```
 /usr/local/go/current -
-       |-1.11rc1
-       |-1.11.4
-       |-1.12
-       |-current -> 1.12
+      |-1.15.6
+      |-1.16
+      |-current -> 1.16
 ```
 
 If it does not exist, download it and switch it.
 
+Beta and Candidate Release are also available for install.
+
+e.g.) golin 1.16beta1
+      golin 1.16rc1
+
 # when using for the first time
 
+if go already exists...
 You should create and manage a management directory.
-
 
 For example ...
 

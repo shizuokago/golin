@@ -12,22 +12,16 @@ import (
 	"time"
 )
 
-func Usage() string {
-	return `
-      golin version
-      golin install {path}
-      golin list
-
-      golin {version}
-    `
-}
-
 //定数
 const (
 	defaultLinkName = "current"       //作成するリンク名
 	downloadLink    = "golang.org/dl" //ダウンロード時のリンク先
 	workDirectory   = "golin_work"    //権限確認用のディレクトリ名
 )
+
+func Install() error {
+	return fmt.Errorf("not implemented")
+}
 
 //
 // Create is create symblic link
