@@ -12,12 +12,16 @@ import (
 // golin設定用のオプション
 var op *golin.Option
 
+var version string
+var revision string
+
 // Initialize golin command
 //
 // オプションに-dでリンク名を変更できるようにし、Usageを設定する
 func init() {
 	op = golin.DefaultOption()
 	flag.StringVar(&op.LinkName, "d", op.LinkName, "symbolic link name")
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `
 Usage of golin:
@@ -81,6 +85,7 @@ Usage of golin:
 // list でダウンロードできるバージョンのリストを表示
 // development で最新の開発バージョンを取得
 const (
+	Version      = "version"
 	Install      = "install"
 	DownloadList = "list"
 	Development  = "dev"
@@ -103,6 +108,8 @@ func main() {
 	golin.SetOption(op)
 
 	switch arg {
+	case Version:
+		err = printVersion()
 	case DownloadList:
 		err = golin.Print()
 	case Development:
@@ -118,4 +125,12 @@ func main() {
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+func printVersion() error {
+	if version == "" || revision == "" {
+		return fmt.Errorf("version is empty.")
+	}
+	fmt.Printf("Version: %s(%s)\n", version, revision)
+	return nil
 }
