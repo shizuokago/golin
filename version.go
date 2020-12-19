@@ -14,9 +14,32 @@ import (
 type Version struct {
 	v    int
 	r    int
-	mean string
+	mean VersionMean
 	m    int
 	src  string
+}
+
+type VersionMean int
+
+const (
+	Major VersionMean = iota
+	RC
+	Beta
+	MeanError
+)
+
+func (m VersionMean) String() string {
+	switch m {
+	case Major:
+		return "Major"
+	case RC:
+		return "rc"
+	case Beta:
+		return "beta"
+	case MeanError:
+		return "Version Mean Error"
+	}
+	return "error(Mean not found)"
 }
 
 // Parse version string
@@ -24,7 +47,7 @@ type Version struct {
 // mean = major,rc,beta
 func NewVersion(src string) *Version {
 	v := &Version{
-		mean: "major",
+		mean: Major,
 		src:  src,
 	}
 	var err error
@@ -41,26 +64,26 @@ func NewVersion(src string) *Version {
 	}
 
 	if err != nil {
-		v.mean = "error"
+		v.mean = MeanError
 	}
 	return v
 }
 
 // setRevision
 func (v *Version) setRevision(r string) error {
-	key := ""
+	key := Major
 	if strings.Index(r, "beta") != -1 {
-		key = "beta"
+		key = Beta
 	} else if strings.Index(r, "rc") != -1 {
-		key = "rc"
+		key = RC
 	}
 
 	var err error
-	if key == "" {
+	if key == Major {
 		v.r, err = strconv.Atoi(r)
 	} else {
 		v.mean = key
-		slice := strings.Split(r, key)
+		slice := strings.Split(r, key.String())
 		if len(slice) == 2 {
 			v.r, err = strconv.Atoi(slice[0])
 			if err == nil {
@@ -70,7 +93,7 @@ func (v *Version) setRevision(r string) error {
 	}
 
 	if err != nil {
-		v.mean = "error"
+		v.mean = MeanError
 	}
 	return err
 }
@@ -78,9 +101,9 @@ func (v *Version) setRevision(r string) error {
 // Version less
 func (src Version) Less(target *Version) bool {
 
-	if src.mean == "error" {
+	if src.mean == MeanError {
 		return true
-	} else if target.mean == "error" {
+	} else if target.mean == MeanError {
 		return false
 	}
 
@@ -92,18 +115,9 @@ func (src Version) Less(target *Version) bool {
 		return src.r < target.r
 	}
 
+	//定数化したので判定できる
 	if src.mean != target.mean {
-
-		if src.mean == "beta" {
-			return true
-		} else if target.mean == "beta" {
-			return false
-		} else if src.mean == "rc" {
-			return true
-		} else if target.mean == "rc" {
-			return false
-		}
-
+		return src.mean > target.mean
 	} else {
 		return src.m < target.m
 	}
@@ -154,6 +168,10 @@ func createVersionList() ([]*Version, error) {
 		return nil, fmt.Errorf(msg)
 	}
 
+	if len(versionList) <= 0 {
+		return nil, fmt.Errorf("version not found.")
+	}
+
 	v := make([]*Version, 0, 100)
 	for _, elm := range versionList {
 		v = append(v, NewVersion(elm))
@@ -181,4 +199,23 @@ func isGo(name string) bool {
 	}
 
 	return true
+}
+
+func getLatestVersion() (*Version, error) {
+
+	list, err := createVersionList()
+	if err != nil {
+		return nil, xerrors.Errorf("create version list error: %w", err)
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		return list[j].Less(list[i])
+	})
+
+	for _, elm := range list {
+		if elm.mean == Major {
+			return elm, nil
+		}
+	}
+	return nil, fmt.Errorf("Major version not found.")
 }
