@@ -111,7 +111,7 @@ func main() {
 	case Version:
 		err = printVersion()
 	case DownloadList:
-		err = golin.Print()
+		err = golin.PrintGoVersionList()
 	case Development:
 		err = golin.CompileLatestSDK()
 	case Install:

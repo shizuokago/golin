@@ -3,20 +3,18 @@ package golin
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
-	"time"
 )
 
 //定数
 const (
-	defaultLinkName = "current"       //作成するリンク名
-	downloadLink    = "golang.org/dl" //ダウンロード時のリンク先
-	workDirectory   = "golin_work"    //権限確認用のディレクトリ名
+	defaultLinkName = "current"                      //作成するリンク名
+	downloadLink    = "golang.org/dl"                //ダウンロード時のリンク先
+	workDirectory   = "golin_work"                   //権限確認用のディレクトリ名
+	downloadPage    = "https://github.com/golang/dl" //GitHub上のバージョンリスト
 )
 
 func Install() error {
@@ -76,13 +74,13 @@ func CompileLatestSDK() error {
 }
 
 //
-// Print is download list printing
+// PrintGoVersionList is download list printing
 //
-// バージョンリストを元に並び替えを行い表示します
+// インストール可能なバージョンリストを元に並び替えを行い表示します
 // 存在するバージョンには「*」を表示します
 //
-func Print() error {
-	verList, err := getVersionList()
+func PrintGoVersionList() error {
+	verList, err := createVersionList()
 	if err != nil {
 		return err
 	}
@@ -213,81 +211,6 @@ func getSDKPath(v string) string {
 		return ""
 	}
 	return filepath.Join(home, "sdk", "go"+v)
-}
-
-//
-// getVersionList is return Download list
-//
-// ダウンロードのリポジトリをgo getし、
-// ディレクトリ名からダウンロード可能なバージョンのリストを作成
-//
-// TODO(secondarykey) : sudo時にgo getしてしまうと、キャシュ等で権限を奪われてしまう
-//
-func getVersionList() ([]*Version, error) {
-
-	// go get golang.org/dl/
-	cmd := exec.Command("go", "get", "-u", downloadLink)
-
-	// no go files error
-	runCmd(cmd)
-
-	dir := ""
-	// Modulesの有無で判断
-	modules := os.Getenv("GO111MODULE")
-
-	if modules == "off" {
-		dir = filepath.Join(GetGoPath(), "src", filepath.Clean(downloadLink))
-	} else {
-
-		//pkg/mod内のすべてのパスを取得
-		dirDl := filepath.Join(GetGoPath(), "pkg", "mod", filepath.Clean(downloadLink)+"@*")
-
-		matches, err := filepath.Glob(dirDl)
-		if err != nil {
-			return nil, err
-		}
-
-		t := time.Time{}.Unix()
-		//最新のDirを設定
-		for _, match := range matches {
-			info, err := os.Stat(match)
-			if err != nil {
-				return nil, err
-			}
-
-			if info.ModTime().Unix() > t {
-				dir = match
-				t = info.ModTime().Unix()
-			}
-		}
-	}
-
-	//ディレクトリを取得
-	infos, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	versionList := make([]*Version, 0, len(infos))
-	//全バージョンを取得
-	for _, info := range infos {
-
-		if !info.IsDir() {
-			continue
-		}
-
-		name := info.Name()
-		if name != "internal" && name != ".git" && name != "gotip" {
-			ver := strings.Replace(name, "go", "", -1)
-			versionList = append(versionList, NewVersion(ver))
-		}
-	}
-
-	sort.Slice(versionList, func(i, j int) bool {
-		return versionList[i].Less(versionList[j])
-	})
-
-	return versionList, nil
 }
 
 //
@@ -483,4 +406,32 @@ func printGoVersion(prefix string) {
 
 	op := getOption()
 	fmt.Fprintln(op.StdOut, prefix, ver)
+}
+
+//
+// existGo is go command exist
+//
+// goコマンドが存在するかを見ます
+//
+func existGo() bool {
+	out, err := exec.Command("go", "version").Output()
+	if err != nil {
+		return false
+	}
+	if out != nil && len(out) != 0 {
+		return true
+	}
+	return false
+}
+
+//
+// existGoRoot is environment GOROOT exist
+//
+// 環境変数GOROOTが存在するかを確認
+//
+func existGoRoot() bool {
+	if os.Getenv("GOROOT") == "" {
+		return false
+	}
+	return true
 }

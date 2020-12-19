@@ -1,8 +1,13 @@
 package golin
 
 import (
+	"fmt"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/xerrors"
 )
 
 // Version is r.v.m version
@@ -109,4 +114,71 @@ func (src Version) Less(target *Version) bool {
 // print source
 func (v Version) String() string {
 	return v.src
+}
+
+func createVersionList() ([]*Version, error) {
+
+	doc, err := goquery.NewDocument("https://github.com/golang/dl")
+	if err != nil {
+		return nil, xerrors.Errorf("error github page: %w", err)
+	}
+
+	//main#js-repo-pjax-container
+	//div.Box
+	versionList := make([]string, 0, 100)
+
+	boxRow := doc.Find("div.Box-row")
+	if boxRow.Length() == 0 {
+		return nil, xerrors.Errorf("Box-row is empty")
+	}
+
+	errs := make([]error, 0)
+
+	boxRow.Each(func(_ int, s *goquery.Selection) {
+		link := s.Find("a.js-navigation-open")
+		if link.Length() == 0 {
+			errs = append(errs, fmt.Errorf("link(a.js-navigation-open) not found."))
+			return
+		}
+		name := link.First().Text()
+		if isGo(name) {
+			versionList = append(versionList, name[2:])
+		}
+	})
+
+	if len(errs) > 0 {
+		msg := "link list error:"
+		for _, elm := range errs {
+			msg += "\n    " + elm.Error()
+		}
+		return nil, fmt.Errorf(msg)
+	}
+
+	v := make([]*Version, 0, 100)
+	for _, elm := range versionList {
+		v = append(v, NewVersion(elm))
+	}
+
+	sort.Slice(v, func(i, j int) bool {
+		return v[i].Less(v[j])
+	})
+
+	return v, nil
+}
+
+func isGo(name string) bool {
+
+	if len(name) < 3 {
+		return false
+	}
+
+	if strings.Index(name, "go") != 0 {
+		return false
+	}
+
+	if _, err := strconv.Atoi(name[2:3]); err != nil {
+		return false
+	}
+
+	return true
 }
