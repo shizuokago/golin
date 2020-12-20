@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cheggaaa/pb/v3"
 	"golang.org/x/xerrors"
@@ -141,6 +142,9 @@ func decompressTarGz(r io.Reader, dir string) error {
 
 	tr := tar.NewReader(gzr)
 
+	fmt.Println(time.Now())
+
+	bar := pb.StartNew(10000)
 	for {
 		th, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -167,7 +171,11 @@ func decompressTarGz(r io.Reader, dir string) error {
 				return xerrors.Errorf("bin file os.Chmod(): %w", err)
 			}
 		}
+		bar.Increment()
 	}
+
+	bar.Finish()
+	fmt.Println(time.Now())
 
 	return nil
 }
