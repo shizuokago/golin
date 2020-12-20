@@ -53,8 +53,11 @@ func NewVersion(src string) *Version {
 	var err error
 	slice := strings.Split(src, ".")
 	if len(slice) > 0 {
+		//バージョン部分を数値化
 		v.v, err = strconv.Atoi(slice[0])
+		//エラーがない場合
 		if len(slice) > 1 && err == nil {
+			//リビジョンを設定
 			r := slice[1]
 			err = v.setRevision(r)
 			if len(slice) > 2 && err == nil {
@@ -125,37 +128,44 @@ func (src Version) Less(target *Version) bool {
 	return false
 }
 
-// print source
 func (v Version) String() string {
 	return v.src
 }
 
+// GitHubのバージョン解析用のタグ
+const (
+	firstTag  = "div.Box-row"
+	secondTag = "a.js-navigation-open"
+)
+
+// GitHubページ(dl)からバージョンを確認して、
+// 可能なバージョンのスライスを取得
 func createVersionList() ([]*Version, error) {
 
-	doc, err := goquery.NewDocument("https://github.com/golang/dl")
+	doc, err := goquery.NewDocument(GitHubDownloadPage)
 	if err != nil {
 		return nil, xerrors.Errorf("error github page: %w", err)
 	}
 
 	//main#js-repo-pjax-container
 	//div.Box
-	versionList := make([]string, 0, 100)
 
-	boxRow := doc.Find("div.Box-row")
+	boxRow := doc.Find(firstTag)
 	if boxRow.Length() == 0 {
 		return nil, xerrors.Errorf("Box-row is empty")
 	}
 
+	versionList := make([]string, 0, 100)
 	errs := make([]error, 0)
 
 	boxRow.Each(func(_ int, s *goquery.Selection) {
-		link := s.Find("a.js-navigation-open")
+		link := s.Find(secondTag)
 		if link.Length() == 0 {
 			errs = append(errs, fmt.Errorf("link(a.js-navigation-open) not found."))
 			return
 		}
 		name := link.First().Text()
-		if isGo(name) {
+		if isVersion(name) {
 			versionList = append(versionList, name[2:])
 		}
 	})
@@ -184,7 +194,8 @@ func createVersionList() ([]*Version, error) {
 	return v, nil
 }
 
-func isGo(name string) bool {
+//バージョンを表すか？
+func isVersion(name string) bool {
 
 	if len(name) < 3 {
 		return false
@@ -201,6 +212,7 @@ func isGo(name string) bool {
 	return true
 }
 
+//最新のバージョンを取得
 func getLatestVersion() (*Version, error) {
 
 	list, err := createVersionList()

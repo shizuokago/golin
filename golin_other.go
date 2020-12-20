@@ -15,3 +15,7 @@ func getHome() string {
 	home := os.Getenv("HOME")
 	return home
 }
+
+func getDownloadExt() string {
+	return "tar.gz"
+}

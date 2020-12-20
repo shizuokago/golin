@@ -6,19 +6,61 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+
+	"golang.org/x/xerrors"
 )
 
 //定数
 const (
-	defaultLinkName = "current"                      //作成するリンク名
-	downloadLink    = "golang.org/dl"                //ダウンロード時のリンク先
-	workDirectory   = "golin_work"                   //権限確認用のディレクトリ名
-	downloadPage    = "https://github.com/golang/dl" //GitHub上のバージョンリスト
+	defaultLinkName    = "current"                      //作成するリンク名
+	downloadLink       = "golang.org/dl"                //ダウンロード時のリンク先
+	workDirectory      = "golin_work"                   //権限確認用のディレクトリ名
+	GitHubDownloadPage = "https://github.com/golang/dl" //GitHub上のバージョンリスト
+	GolangDownloadPage = "https://golang.org/dl"        //
 )
 
-func Install() error {
-	return fmt.Errorf("not implemented")
+func Install(path string) error {
+
+	//権限の確認
+
+	// go ,GOROOTが存在した場合、問い合わせ
+
+	// 最終バージョンを取得
+	v, err := getLatestVersion()
+	if err != nil {
+		return xerrors.Errorf("getLatestVersion() error: %w", err)
+	}
+
+	// そのバージョンをダウンロードし展開
+	url := fmt.Sprintf("%s/go%s.%s-%s.%s", GolangDownloadPage, v.String(), runtime.GOOS, runtime.GOARCH, getDownloadExt())
+
+	fmt.Println("Download Latest Version:", url)
+
+	dp := filepath.Join(path, v.String())
+	//作成
+	err = DecompressURL(url, dp)
+	if err != nil {
+		return xerrors.Errorf("DecompressURL() error: %w", err)
+	}
+
+	//currentを作成
+	link, err := readyLink(path)
+	if err != nil {
+		return xerrors.Errorf("readyLink() error: %w", err)
+	}
+
+	//シンボリックリンクを作成
+	err = os.Symlink(dp, link)
+	if err != nil {
+		return xerrors.Errorf("symlink: %w", err)
+	}
+
+	// 各OSに合わせた設定手順を表示
+	printSetting(link, v.String())
+
+	return nil
 }
 
 //
@@ -32,33 +74,42 @@ func Install() error {
 //
 func Create(v string) error {
 
-	root, err := getRoot(v)
-	if err != nil {
-		return err
-	}
+	var err error
+	root := v
 
+	//ルートを取得
+	root, err = getRoot(v)
+	if err != nil {
+		return xerrors.Errorf("getRoot() error: %w", err)
+	}
+	//権限チェック
 	err = checkAuthorization(root)
 	if err != nil {
-		return err
+		return xerrors.Errorf("authorization error: %w", err)
 	}
 
+	//設定前のGoのバージョン表示
 	printGoVersion("Before:")
 
+	//指定バージョンでパスを作成
 	path, err := readyPath(root, v)
 	if err != nil {
-		return err
+		return xerrors.Errorf("ready path: %w", err)
 	}
 
+	//シンボリックを準備
 	link, err := readyLink(root)
 	if err != nil {
-		return err
+		return xerrors.Errorf("ready link: %w", err)
 	}
 
+	//シンボリックリンクを作成
 	err = os.Symlink(path, link)
 	if err != nil {
-		return err
+		return xerrors.Errorf("symlink: %w", err)
 	}
 
+	//終了したバージョンを作成
 	printGoVersion("After :")
 
 	return nil
@@ -80,6 +131,7 @@ func CompileLatestSDK() error {
 // 存在するバージョンには「*」を表示します
 //
 func PrintGoVersionList() error {
+
 	verList, err := createVersionList()
 	if err != nil {
 		return err
@@ -250,14 +302,14 @@ func Download(v string) (string, error) {
 	//$GOPATH/bin/go{version}{.exe}
 	bin, err := createDownloadCmd(v)
 	if err != nil {
-		return "", err
+		return "", xerrors.Errorf("create download command: %w", err)
 	}
 	//delete exe file
 	defer os.Remove(bin)
 
 	err = runDownloadCmd(bin)
 	if err != nil {
-		return "", err
+		return "", xerrors.Errorf("run download command: %w", err)
 	}
 
 	return getSDKPath(v), nil
@@ -284,6 +336,7 @@ func readyLink(dir string) (string, error) {
 			return "", err
 		}
 	} else {
+		//???
 	}
 	return link, nil
 }
@@ -315,13 +368,13 @@ func readyPath(dir, v string) (string, error) {
 	//go download
 	sdk, err := Download(v)
 	if err != nil {
-		return "", err
+		return "", xerrors.Errorf("download error: %w", err)
 	}
 
 	//Download SDK Rename
 	err = os.Rename(sdk+string(filepath.Separator), path+string(filepath.Separator))
 	if err != nil {
-		return "", err
+		return "", xerrors.Errorf("rename error: %w", err)
 	}
 	return path, nil
 }
@@ -434,4 +487,17 @@ func existGoRoot() bool {
 		return false
 	}
 	return true
+}
+
+func printSetting(root, version string) {
+	fmt.Printf(`
+%s にGoの最新バージョン(%s)をインストールしました。
+環境変数GOROOTに%sを設定し、PATHをGOROOT/binに設定してください。
+
+今後は
+
+  $ golin 1.16
+
+などでバージョンの切り替えが可能になります。
+    `, root, version, root)
 }

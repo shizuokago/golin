@@ -11,7 +11,8 @@
 
 # set -e
 Version="v2.0.0beta"
-Revision==$(git rev-parse --short HEAD)
+Revision=$(git rev-parse --short HEAD)
+Date=$(date -u -R)
 
 echo "============================================"
 echo "Build Version: ${Version}"
@@ -36,7 +37,7 @@ do
       EXT=".exe"
   fi
   OUTPUT=golin${EXT}
-  GOOS=${GOOS} GOARCH=${GOARCH} go build -ldflags "-X main.version=${Version} -X main.revision=${Revision}" -o ${OUTPUT} ../golin/main.go
+  GOOS=${GOOS} GOARCH=${GOARCH} go build -ldflags "-X main.version=${Version} -X main.revision=${Revision} -X main.date=${Date}" -o ${OUTPUT} ../golin/main.go
 
   gzip -9 ${OUTPUT} -c > golin_${GOOS}_${GOARCH}.gz
 

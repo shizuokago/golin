@@ -15,3 +15,7 @@ func getHome() string {
 	home := os.Getenv("USERPROFILE")
 	return home
 }
+
+func getDownloadExt() string {
+	return "zip"
+}

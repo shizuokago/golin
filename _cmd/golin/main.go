@@ -12,8 +12,11 @@ import (
 // golin設定用のオプション
 var op *golin.Option
 
-var version string
-var revision string
+var (
+	version  string
+	revision string
+	date     string
+)
 
 // Initialize golin command
 //
@@ -98,7 +101,7 @@ func main() {
 
 	flag.Parse()
 	args := flag.Args()
-	if len(args) != 1 {
+	if len(args) < 1 {
 		fmt.Printf("golin arguments required version")
 		os.Exit(1)
 	}
@@ -115,13 +118,14 @@ func main() {
 	case Development:
 		err = golin.CompileLatestSDK()
 	case Install:
-		err = golin.Install()
+		path := args[1]
+		err = golin.Install(path)
 	default:
 		err = golin.Create(arg)
 	}
 
 	if err != nil {
-		fmt.Printf("Error:\n  %v\n", err)
+		fmt.Printf("Error:\n  %+v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
@@ -131,6 +135,6 @@ func printVersion() error {
 	if version == "" || revision == "" {
 		return fmt.Errorf("version is empty.")
 	}
-	fmt.Printf("Version: %s(%s)\n", version, revision)
+	fmt.Printf("Version: %s %s (%s)\n", version, date, revision)
 	return nil
 }
