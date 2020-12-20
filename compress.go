@@ -78,6 +78,7 @@ func decompressZip(r io.Reader, dir string) error {
 	bar := pb.StartNew(len(zr.File))
 	for _, f := range zr.File {
 
+		//goを変換
 		fn := filepath.Clean(dir + f.Name[2:])
 
 		info := f.FileInfo()
@@ -123,15 +124,22 @@ func createZipFile(zf *zip.File, n string) error {
 
 func decompressTarGz(r io.Reader, dir string) error {
 
+	err := os.Mkdir(dir, 0777)
+	if err != nil {
+		return xerrors.Errorf("make directory error: %w", err)
+	}
+
+	fmt.Println("Downloaded!")
+
 	gzr, err := gzip.NewReader(r)
 	if err != nil {
 		return xerrors.Errorf("gzip.NewReader() error: %w", err)
 	}
 	defer gzr.Close()
 
-	tr := tar.NewReader(gzr)
+	fmt.Println("Decompress...")
 
-	//dirを作成
+	tr := tar.NewReader(gzr)
 
 	for {
 		th, err := tr.Next()
@@ -139,7 +147,48 @@ func decompressTarGz(r io.Reader, dir string) error {
 			break
 		}
 
-		fmt.Println(th.Name)
+		run := false
+		name := th.Name[2:]
+		if strings.Index(name, "/bin/") == 0 {
+			run = true
+		}
+		//goを変換
+		fn := filepath.Clean(dir + name)
+
+		if th.Typeflag == tar.TypeDir {
+			err = os.MkdirAll(fn, 0777)
+			if err != nil {
+				return xerrors.Errorf("make directory error: %w", err)
+			}
+		} else {
+			err = createTarFile(tr, fn)
+			if err != nil {
+				return xerrors.Errorf("createTarFile(): %w", err)
+			}
+
+			if run {
+				err = os.Chmod(fn, 0755)
+				if err != nil {
+					return xerrors.Errorf("bin file os.Chmod(): %w", err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func createTarFile(r io.Reader, f string) error {
+
+	fo, err := os.Create(f)
+	if err != nil {
+		return xerrors.Errorf("file create: %w", err)
+	}
+	defer fo.Close()
+
+	_, err = io.Copy(fo, r)
+	if err != nil {
+		return xerrors.Errorf("file copy: %w", err)
 	}
 
 	return nil
