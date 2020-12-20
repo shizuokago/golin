@@ -88,10 +88,11 @@ Usage of golin:
 // list でダウンロードできるバージョンのリストを表示
 // development で最新の開発バージョンを取得
 const (
-	Version      = "version"
-	Install      = "install"
-	DownloadList = "list"
-	Development  = "dev"
+	Version         = "version"
+	Install         = "install"
+	DownloadList    = "list"
+	Development     = "dev"
+	ReleaseCompress = "compress"
 )
 
 //
@@ -120,6 +121,10 @@ func main() {
 	case Install:
 		path := args[1]
 		err = golin.Install(path)
+	case ReleaseCompress:
+		path := args[1]
+		exe := args[2]
+		err = golin.CompressReleaseZip(path, exe)
 	default:
 		err = golin.Create(arg)
 	}
@@ -132,7 +137,7 @@ func main() {
 }
 
 func printVersion() error {
-	if version == "" || revision == "" {
+	if version == "" || revision == "" || date == "" {
 		return fmt.Errorf("version is empty.")
 	}
 	fmt.Printf("Version: %s %s (%s)\n", version, date, revision)

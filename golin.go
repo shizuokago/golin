@@ -501,3 +501,20 @@ func printSetting(root, version string) {
 などでバージョンの切り替えが可能になります。
     `, root, version, root)
 }
+
+// リリース用のZIPを作成
+func CompressReleaseZip(dst string, cmd string) error {
+
+	w, err := os.Create(dst)
+	if err != nil {
+		return xerrors.Errorf("os.Create(): %w", err)
+	}
+	defer w.Close()
+
+	err = Compress(w, cmd, "README.md")
+	if err != nil {
+		return xerrors.Errorf("CompressZip(): %w", err)
+	}
+
+	return nil
+}

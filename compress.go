@@ -36,6 +36,80 @@ func getCompressType(n string) CompressType {
 	return CompressNotSupported
 }
 
+func Compress(w io.Writer, files ...string) error {
+
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	for _, name := range files {
+		err := addFiles(zw, name)
+		if err != nil {
+			return xerrors.Errorf("addFile() error: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func addFiles(w *zip.Writer, name string) error {
+	info, err := os.Stat(name)
+	if err != nil {
+		return xerrors.Errorf("os.Stat(): %w", err)
+	}
+
+	if info.IsDir() {
+		infos, err := ioutil.ReadDir(name)
+		if err != nil {
+			return xerrors.Errorf("ioutil.ReadDir() error: %w", err)
+		}
+		for _, elm := range infos {
+			err := addFiles(w, elm.Name())
+			if err != nil {
+				return xerrors.Errorf("addFile() error: %w", err)
+			}
+		}
+	} else {
+		err = addFile(w, name)
+		if err != nil {
+			return xerrors.Errorf("addFile() error: %w", err)
+		}
+	}
+	return nil
+}
+
+func addFile(w *zip.Writer, name string) error {
+
+	data, err := ioutil.ReadFile(name)
+	if err != nil {
+		return xerrors.Errorf("ioutil.ReadFile() error: %w", err)
+	}
+
+	info, err := os.Lstat(name)
+	if err != nil {
+		return xerrors.Errorf("os.Lstat() error: %w", err)
+	}
+
+	h, err := zip.FileInfoHeader(info)
+	if err != nil {
+		return xerrors.Errorf("zip.FileInfoHeader() error: %w", err)
+	}
+
+	h.Name = name
+	h.Method = zip.Deflate
+
+	writer, err := w.CreateHeader(h)
+	if err != nil {
+		return xerrors.Errorf("writer CreateHeader() error: %w", err)
+	}
+
+	_, err = writer.Write(data)
+	if err != nil {
+		return xerrors.Errorf("writer Write() error: %w", err)
+	}
+
+	return nil
+}
+
 func DecompressURL(url string, dir string) error {
 
 	resp, err := http.Get(url)
