@@ -147,11 +147,7 @@ func decompressTarGz(r io.Reader, dir string) error {
 			break
 		}
 
-		run := false
 		name := th.Name[2:]
-		if strings.Index(name, "/bin/") == 0 {
-			run = true
-		}
 		//goを変換
 		fn := filepath.Clean(dir + name)
 
@@ -166,11 +162,9 @@ func decompressTarGz(r io.Reader, dir string) error {
 				return xerrors.Errorf("createTarFile(): %w", err)
 			}
 
-			if run {
-				err = os.Chmod(fn, 0755)
-				if err != nil {
-					return xerrors.Errorf("bin file os.Chmod(): %w", err)
-				}
+			err = os.Chmod(fn, os.FileMode(th.Mode))
+			if err != nil {
+				return xerrors.Errorf("bin file os.Chmod(): %w", err)
 			}
 		}
 	}
