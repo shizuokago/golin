@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# golin のバージョンを実行してエラーかを見て終了する
+
 # Environment list
 # $GOOS     $GOARCH
 # darwin    arm64
@@ -10,7 +12,7 @@
 # linux     amd64
 
 # set -e
-Version="v2.0.0rc1"
+Version="2.0.0rc1"
 Revision=$(git rev-parse --short HEAD)
 Date=$(date -u -R)
 
@@ -30,10 +32,13 @@ cp ../../README.md ./
 
 for i in `seq 0 1 5`
 do
+
   GOOS=${OS["$i"]}
   GOARCH=${ARCH["$i"]}
 
   echo "Build OS=$GOOS ARCHITECT=$GOARCH start"
+
+  BUILD=$GOOS/$GOARCH
 
   EXT=""
   if [ $GOOS = "windows" ]; then
@@ -41,11 +46,15 @@ do
   fi
   OUTPUT=golin${EXT}
 
-  GOOS=${GOOS} GOARCH=${GOARCH} go build -ldflags "-X 'main.version=${Version}' -X 'main.revision=${Revision}' -X 'main.date=${Date}'" -o ${OUTPUT} ../golin/main.go
+  GOOS=${GOOS} GOARCH=${GOARCH} \
+      go build \
+      -ldflags "-X 'main.version=${Version}' -X 'main.revision=${Revision}' -X 'main.date=${Date}' -X 'main.build=${BUILD}'" \
+      -o ${OUTPUT} \
+      ../golin/main.go
 
   ZIPNAME="golin_${GOOS}_${GOARCH}.zip"
 
-  echo "Compress"
+  echo "Compress ${ZIPNAME}"
   go run ../golin/main.go compress ${ZIPNAME} $OUTPUT
 
   rm ${OUTPUT}

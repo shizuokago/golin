@@ -16,6 +16,7 @@ var (
 	version  string
 	revision string
 	date     string
+	build    string
 )
 
 // Initialize golin command
@@ -24,63 +25,7 @@ var (
 func init() {
 	op = golin.DefaultOption()
 	flag.StringVar(&op.LinkName, "d", op.LinkName, "symbolic link name")
-
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, `
-Usage of golin:
-
-    It is possible to switch by setting GOROOT to a symbolic link.
-    A list of downloads is available at the link below.
-
-        https://github.com/golang/dl
-
-    まだGoが存在しない場合、
-
-        golin install {path}
-
-    これにより最新のGoがインストールされます。
-    {path}はGOROOTの元になる位置を指定します。
-
-       e.g) golin install /usr/local/go
-
-    これを行うことで{path}/{version}にGoが設定され、
-    そのGoに対して{path}/current にシンボリックリンクを作成します。
-
-    あなたはその後、{path}/currentに対して、GOROOTの環境変数を設定する必要があります。
-
-    Goのバージョンの切り替えは
-    Please remove the "go" for the specification of the version.
-    (ex: go1.12.1 -> 1.12.1
-
-        golin 1.12.1
-
-    現在インストール可能なGoのバージョンと、インストールされているバージョンは
-
-        golin list
-    
-    を実行することで一覧で表示されます。
-
-    現在開発中の最新バージョン(gotip)を手に入れる場合
-
-        golin dev
-
-    を行うとビルドして更新されます（少し時間がかかります。
-    devはビルドしたバージョンの有無ではなく、常に最新のビルドを行いますが
-
-       golin tip
-
-    はdevでビルドしたバージョンが存在する場合、切り替えるのみで終了します
-
-    また-d を指定することでcurrentを変更することができます
-
-       e.g.) golin -d root 1.16
-
-    これにより切り替え先のシンボリックリンクが{path}/rootになりますので、
-    そこをGOROOTに指定してください。
-
-`)
-		flag.PrintDefaults()
-	}
+	flag.Usage = Usage
 }
 
 // 特殊引数
@@ -137,9 +82,66 @@ func main() {
 }
 
 func printVersion() error {
-	if version == "" || revision == "" || date == "" {
+	if version == "" || revision == "" || date == "" || build == "" {
 		return fmt.Errorf("version is empty.")
 	}
-	fmt.Printf("Version: %s %s (%s)\n", version, date, revision)
+	fmt.Printf("golin version %s %s\nBuild Information:%s (%s)\n",
+		version, build, date, revision)
 	return nil
+}
+
+func Usage() {
+	help := `Usage of golin:
+
+  It is possible to switch by setting GOROOT to a symbolic link.
+  A list of downloads is available at the link below.
+
+      https://github.com/golang/dl
+
+  まだGoが存在しない場合、
+
+      golin install {path}
+
+  これにより最新のGoがインストールされます。
+  {path}はGOROOTの元になる位置を指定します。
+
+     e.g) golin install /usr/local/go
+
+  これを行うことで{path}/{version}にGoが設定され、
+  そのGoに対して{path}/current にシンボリックリンクを作成します。
+
+  あなたはその後、{path}/currentに対して、GOROOTの環境変数を設定する必要があります。
+
+  Goのバージョンの切り替えは
+  Please remove the "go" for the specification of the version.
+    (ex: go1.12.1 -> 1.12.1
+
+      golin 1.12.1
+
+  現在インストール可能なGoのバージョンと、インストールされているバージョンは
+
+      golin list
+    
+  を実行することで一覧で表示されます。
+
+  現在開発中の最新バージョン(gotip)を手に入れる場合
+
+      golin dev
+
+  を行うとビルドして更新されます（少し時間がかかります。
+  devはビルドしたバージョンの有無ではなく、常に最新のビルドを行いますが
+
+     golin tip
+
+  はdevでビルドしたバージョンが存在する場合、切り替えるのみで終了します
+
+  また-d を指定することでcurrentを変更することができます
+
+     e.g.) golin -d root 1.16
+
+  これにより切り替え先のシンボリックリンクが{path}/rootになりますので、
+  そこをGOROOTに指定してください。
+`
+	fmt.Fprintf(os.Stderr, help)
+	flag.PrintDefaults()
 }

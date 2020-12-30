@@ -24,8 +24,10 @@ const (
 func Install(path string) error {
 
 	//権限の確認
-
-	// go ,GOROOTが存在した場合、問い合わせ
+	err := checkAuthorization(path)
+	if err != nil {
+		return xerrors.Errorf("Authorization error: %w", err)
+	}
 
 	// 最終バージョンを取得
 	v, err := getLatestVersion()
@@ -178,14 +180,14 @@ func checkAuthorization(path string) error {
 	work := filepath.Join(path, "."+workDirectory)
 	err := os.Mkdir(work, 0777)
 	if err != nil {
-		return err
+		return xerrors.Errorf("そのディレクトリに権限がありません。: %w", err)
 	}
 	defer os.Remove(work)
 
 	link := filepath.Join(path, "_"+workDirectory+"_")
 	err = os.Symlink(work, link)
 	if err != nil {
-		return err
+		return xerrors.Errorf("シンボリックリンクの作成に失敗しました。", err)
 	}
 	defer os.Remove(link)
 
@@ -462,7 +464,7 @@ func printGoVersion(prefix string) {
 }
 
 //
-// existGo is go command exist
+// existsGo is go command exists
 //
 // goコマンドが存在するかを見ます
 //
@@ -475,18 +477,6 @@ func existGo() bool {
 		return true
 	}
 	return false
-}
-
-//
-// existGoRoot is environment GOROOT exist
-//
-// 環境変数GOROOTが存在するかを確認
-//
-func existGoRoot() bool {
-	if os.Getenv("GOROOT") == "" {
-		return false
-	}
-	return true
 }
 
 func printSetting(root, version string) {
