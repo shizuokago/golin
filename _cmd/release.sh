@@ -1,6 +1,12 @@
 #!/bin/sh
 
-# golin のバージョンを実行してエラーかを見て終了する
+go build -o build_test ./golin/main.go
+if [ "$?" -ne 0 ]; then
+    echo "golin build error."
+    exit 1
+else
+    rm "build_test"
+fi
 
 # Environment list
 # $GOOS     $GOARCH

@@ -7,10 +7,8 @@ import (
 	"os"
 
 	"github.com/shizuokago/golin"
+	"github.com/shizuokago/golin/config"
 )
-
-// golin設定用のオプション
-var op *golin.Option
 
 var (
 	version  string
@@ -19,25 +17,37 @@ var (
 	build    string
 )
 
+var (
+	link string
+)
+
 // Initialize golin command
 //
 // オプションに-dでリンク名を変更できるようにし、Usageを設定する
 func init() {
-	op = golin.DefaultOption()
-	flag.StringVar(&op.LinkName, "d", op.LinkName, "symbolic link name")
+	flag.StringVar(&link, "d", config.DefaultLinkName, "symbolic link name")
 	flag.Usage = Usage
 }
 
-// 特殊引数
+type Cmd string
+
 //
-// list でダウンロードできるバージョンのリストを表示
-// development で最新の開発バージョンを取得
+// golinコマンド
+//
+// version  バージョン表示
+// install  Goのインストール
+// list     ダウンロードできるバージョンのリストを表示
+// dev      最新の開発バージョンを取得
+// compress コマンド等の圧縮(リリース用)
+//
 const (
-	Version         = "version"
-	Install         = "install"
-	DownloadList    = "list"
-	Development     = "dev"
-	ReleaseCompress = "compress"
+	Version         Cmd = "version"
+	Install         Cmd = "install"
+	DownloadList    Cmd = "list"
+	Development     Cmd = "dev"
+	ReleaseCompress Cmd = "compress"
+	//バージョン指定を行っている場合の文字列
+	ChangeVersion Cmd = ""
 )
 
 //
@@ -45,48 +55,77 @@ const (
 //
 func main() {
 
-	flag.Parse()
-	args := flag.Args()
-	if len(args) < 1 {
-		fmt.Printf("golin arguments required version")
-		os.Exit(1)
-	}
-
-	var err error
-	arg := args[0]
-	golin.SetOption(op)
-
-	switch arg {
-	case Version:
-		err = printVersion()
-	case DownloadList:
-		err = golin.PrintGoVersionList()
-	case Development:
-		err = golin.CompileLatestSDK()
-	case Install:
-		path := args[1]
-		err = golin.Install(path)
-	case ReleaseCompress:
-		path := args[1]
-		exe := args[2]
-		err = golin.CompressReleaseZip(path, exe)
-	default:
-		err = golin.Create(arg)
-	}
+	err := run()
 
 	if err != nil {
-		fmt.Printf("Error:\n  %+v\n", err)
+		fmt.Printf("golin Error: %+v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Println("Success.")
 	os.Exit(0)
 }
 
-func printVersion() error {
-	if version == "" || revision == "" || date == "" || build == "" {
-		return fmt.Errorf("version is empty.")
+func run() error {
+
+	flag.Parse()
+	args := flag.Args()
+	if len(args) < 1 {
+		return fmt.Errorf("golin arguments required command(install,list,dev,version) or version(e.g. 1.15.6,1.16beta1).")
 	}
-	fmt.Printf("golin version %s %s\nBuild Information:%s (%s)\n",
-		version, build, date, revision)
+
+	cmd := Cmd(args[0])
+	//cmd = ChangeVersion
+
+	opts := make([]config.Option, 1)
+	opts[0] = config.SetLinkName(link)
+
+	err := config.Set(opts...)
+	if err != nil {
+		return fmt.Errorf("config.Set() error: %w", err)
+	}
+
+	switch cmd {
+	case Version:
+		//コマンドのバージョン表示
+		err = printVersion()
+	case DownloadList:
+		//ダウンロードのリスト表示
+		err = golin.PrintGoVersionList()
+	case Development:
+		//開発バージョンのコンパイル
+		err = golin.CompileLatestSDK()
+	case Install:
+		if len(args) < 2 {
+			return fmt.Errorf("golin install arguments required path")
+		}
+		path := args[1]
+		v := ""
+		if len(args) >= 3 {
+			v = args[2]
+		}
+		//インストールを行う
+		err = golin.Install(path, v)
+	case ReleaseCompress:
+		if len(args) < 3 {
+			return fmt.Errorf("golin compress arguments required filename and command name.")
+		}
+		dst := args[1]
+		src := args[2]
+		//リリース用のZip作成
+		err = golin.CompressReleaseZip(dst, src)
+	default:
+		if len(args) < 1 {
+			return fmt.Errorf("golin arguments required version(e.g. 1.15.6, 1.16beta1).")
+		}
+		v := args[0]
+		//バージョンの変更
+		err = golin.Create(v)
+	}
+
+	if err != nil {
+		return fmt.Errorf("run error: %w", err)
+	}
 	return nil
 }
 
@@ -100,7 +139,7 @@ func Usage() {
 
   まだGoが存在しない場合、
 
-      golin install {path}
+      golin install {path} 
 
   これにより最新のGoがインストールされます。
   {path}はGOROOTの元になる位置を指定します。
@@ -109,6 +148,7 @@ func Usage() {
 
   これを行うことで{path}/{version}にGoが設定され、
   そのGoに対して{path}/current にシンボリックリンクを作成します。
+  install時は-vを指定することでバージョンを最新以外で選択できます。
 
   あなたはその後、{path}/currentに対して、GOROOTの環境変数を設定する必要があります。
 
@@ -144,4 +184,12 @@ func Usage() {
 `
 	fmt.Fprintf(os.Stderr, help)
 	flag.PrintDefaults()
+}
+
+func printVersion() error {
+	if version == "" || revision == "" || date == "" || build == "" {
+		return fmt.Errorf("version is empty.")
+	}
+	fmt.Printf("golin version %s %s\nBuild Information:%s (%s)", version, build, date, build)
+	return nil
 }

@@ -6,116 +6,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/shizuokago/golin/config"
 	"golang.org/x/xerrors"
 )
 
 //定数
 const (
-	defaultLinkName    = "current"                      //作成するリンク名
-	downloadLink       = "golang.org/dl"                //ダウンロード時のリンク先
-	workDirectory      = "golin_work"                   //権限確認用のディレクトリ名
-	GitHubDownloadPage = "https://github.com/golang/dl" //GitHub上のバージョンリスト
-	GolangDownloadPage = "https://golang.org/dl"        //
+	workDirectory = "golin_work" //権限確認用のディレクトリ名
 )
-
-func Install(path string) error {
-
-	//権限の確認
-	err := checkAuthorization(path)
-	if err != nil {
-		return xerrors.Errorf("Authorization error: %w", err)
-	}
-
-	// 最終バージョンを取得
-	v, err := getLatestVersion()
-	if err != nil {
-		return xerrors.Errorf("getLatestVersion() error: %w", err)
-	}
-
-	// そのバージョンをダウンロードし展開
-	url := fmt.Sprintf("%s/go%s.%s-%s.%s", GolangDownloadPage, v.String(), runtime.GOOS, runtime.GOARCH, getDownloadExt())
-
-	fmt.Println("Download Latest Version:", url)
-
-	dp := filepath.Join(path, v.String())
-	//作成
-	err = DecompressURL(url, dp)
-	if err != nil {
-		return xerrors.Errorf("DecompressURL() error: %w", err)
-	}
-
-	//currentを作成
-	link, err := readyLink(path)
-	if err != nil {
-		return xerrors.Errorf("readyLink() error: %w", err)
-	}
-
-	//シンボリックリンクを作成
-	err = os.Symlink(dp, link)
-	if err != nil {
-		return xerrors.Errorf("symlink: %w", err)
-	}
-
-	// 各OSに合わせた設定手順を表示
-	printSetting(link, v.String())
-
-	return nil
-}
-
-//
-// Create is create symblic link
-//
-// 引数でバージョンを指定します
-// GOROOTの確認、権限の確認、パスの準備、リンクの準備(削除)
-// リンクの張り直しを行います
-//
-// BUG(secondarykey): テストがGo1.12にしてないと通らない
-//
-func Create(v string) error {
-
-	var err error
-	root := v
-
-	//ルートを取得
-	root, err = getRoot(v)
-	if err != nil {
-		return xerrors.Errorf("getRoot() error: %w", err)
-	}
-	//権限チェック
-	err = checkAuthorization(root)
-	if err != nil {
-		return xerrors.Errorf("authorization error: %w", err)
-	}
-
-	//設定前のGoのバージョン表示
-	printGoVersion("Before:")
-
-	//指定バージョンでパスを作成
-	path, err := readyPath(root, v)
-	if err != nil {
-		return xerrors.Errorf("ready path: %w", err)
-	}
-
-	//シンボリックを準備
-	link, err := readyLink(root)
-	if err != nil {
-		return xerrors.Errorf("ready link: %w", err)
-	}
-
-	//シンボリックリンクを作成
-	err = os.Symlink(path, link)
-	if err != nil {
-		return xerrors.Errorf("symlink: %w", err)
-	}
-
-	//終了したバージョンを作成
-	printGoVersion("After :")
-
-	return nil
-}
 
 //
 // CompileGoSDK is Compile from the latest repository to Create GoSDK
@@ -124,50 +24,6 @@ func Create(v string) error {
 //
 func CompileLatestSDK() error {
 	return Create("tip")
-}
-
-//
-// PrintGoVersionList is download list printing
-//
-// インストール可能なバージョンリストを元に並び替えを行い表示します
-// 存在するバージョンには「*」を表示します
-//
-func PrintGoVersionList() error {
-
-	verList, err := createVersionList()
-	if err != nil {
-		return err
-	}
-
-	parent := filepath.Dir(os.Getenv("GOROOT"))
-	gb := filepath.Join(parent, "*")
-
-	matches, err := filepath.Glob(gb)
-	if err != nil {
-		return err
-	}
-
-	exists := make([]string, len(matches))
-	for idx, ex := range matches {
-		wk := strings.Replace(ex, parent, "", 1)
-		exists[idx] = wk[1:]
-	}
-
-	//op := getOption()
-	for _, ver := range verList {
-		v := ver.String()
-
-		for _, ex := range exists {
-			if ex == v {
-				v = v + strings.Repeat(" ", 20-len(v)) + "*"
-				break
-			}
-		}
-
-		fmt.Println(v)
-	}
-
-	return nil
 }
 
 //
@@ -208,15 +64,16 @@ func getRoot(ver string) (string, error) {
 		return "", fmt.Errorf("golin command required GOROOT environment variable.")
 	}
 
-	op := getOption()
+	conf := config.Get()
+	link := conf.LinkName
+
 	root := filepath.Dir(goroot)
 	now := filepath.Base(goroot)
-
-	idx := strings.Index(goroot, op.LinkName)
+	idx := strings.Index(goroot, link)
 
 	//最後がリンク名と同一かを見る
-	if idx != len(goroot)-len(op.LinkName) {
-		fmt.Fprintf(op.StdOut, `
+	if idx != len(goroot)-len(link) {
+		fmt.Fprintf(os.Stdout, `
 This command creates the Go SDK within the current GOROOT parent directory. 
 It is recommended to specify a dedicated directory.
 
@@ -228,10 +85,10 @@ It is recommended to specify a dedicated directory.
 By changing the environment variable GOROOT to [%s], you can easily switch GOROOT.
 
 Is it OK?[Y/n] 
-`, root, now, ver, op.LinkName, ver, filepath.Join(root, op.LinkName))
+`, root, now, ver, link, ver, filepath.Join(root, link))
 
 		//入力受付
-		stdin := bufio.NewScanner(op.StdIn)
+		stdin := bufio.NewScanner(os.Stdin)
 		stdin.Scan()
 		text := stdin.Text()
 		if text != "Y" {
@@ -277,7 +134,7 @@ func getSDKPath(v string) string {
 //
 func createDownloadCmd(v string) (string, error) {
 
-	link := fmt.Sprintf("%s/go%s", downloadLink, v)
+	link := fmt.Sprintf("%s/go%s", config.GoGetLink, v)
 
 	// go get golang.org/dl/go{version}
 	cmd := exec.Command("go", "get", link)
@@ -329,8 +186,9 @@ func Download(v string) (string, error) {
 //
 func readyLink(dir string) (string, error) {
 
-	op := getOption()
-	link := filepath.Join(dir, op.LinkName)
+	conf := config.Get()
+
+	link := filepath.Join(dir, conf.LinkName)
 	//symbliclink
 	if _, err := os.Lstat(link); err == nil {
 		err = os.Remove(link)
@@ -360,7 +218,7 @@ func readyPath(dir, v string) (string, error) {
 			err := os.RemoveAll(path)
 			if err != nil {
 				//開発中実行がこのパスだった場合goを削除できないので無視
-				fmt.Fprintln(getOption().StdErr, err)
+				fmt.Fprintln(os.Stderr, err)
 			}
 		} else {
 			return path, nil
@@ -389,12 +247,11 @@ func readyPath(dir, v string) (string, error) {
 //
 func runCmd(cmd *exec.Cmd) error {
 
-	op := getOption()
-	cmd.Stdout = op.StdOut
-	cmd.Stderr = op.StdErr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		return err
+		return xerrors.Errorf("runCmd() error: %w", err)
 	}
 	return nil
 }
@@ -407,11 +264,11 @@ func runDownloadCmd(bin string) error {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return xerrors.Errorf("stdout pipe error: %w", err)
 	}
 	err = cmd.Start()
 	if err != nil {
-		return err
+		return xerrors.Errorf("command start error: %w", err)
 	}
 
 	go func() {
@@ -424,7 +281,7 @@ func runDownloadCmd(bin string) error {
 
 	err = cmd.Wait()
 	if err != nil {
-		return err
+		return xerrors.Errorf("command wait error: %w", err)
 	}
 
 	fmt.Println("download cmd end")
@@ -459,8 +316,7 @@ func printGoVersion(prefix string) {
 
 	ver := strings.Replace(string(out), "\n", "", -1)
 
-	op := getOption()
-	fmt.Fprintln(op.StdOut, prefix, ver)
+	fmt.Fprintln(os.Stdout, prefix, ver)
 }
 
 //
