@@ -8,11 +8,20 @@ https://github.com/shizuokago/golin/releases
 
 Download the golin that suits your platform.
 
+実行ファイルをPATHに通してください
+
+
+## already Go Runtime installed.
+
+    go get github.com/shizuokago/golin/_cmd/golin
+
+GOBIN(GOPATH/bin)に配布されます。GOBINにPATHが通っていることを確認してください。
+
 # use
 
 If "go" command does not exit yet,"install"
 
-    $ golin install {path}
+    $ golin install {path} {version}
 
 this will install the latest Go on the "path".
 
@@ -53,19 +62,6 @@ Beta and Candidate Release are also available for install.
 
 e.g.) golin 1.16beta1
       golin 1.16rc1
-
-# when using for the first time
-
-if go already exists...
-You should create and manage a management directory.
-
-For example ...
-
-If your GOROOT is "/usr/local/go".
-This command creates "/usr/local/{version}" and "/usr/local/current".
-This will "Hachamecha" "/usr/local"
-
-I think that it is better to set it as "/usr/local/go/{nowversion}".
 
 # super user
 

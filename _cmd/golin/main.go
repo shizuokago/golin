@@ -58,11 +58,10 @@ func main() {
 	err := run()
 
 	if err != nil {
-		fmt.Printf("golin Error: %+v\n", err)
+		fmt.Fprintf(os.Stderr, "golin Error: %+v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Success.")
 	os.Exit(0)
 }
 
@@ -89,6 +88,8 @@ func run() error {
 	case Version:
 		//コマンドのバージョン表示
 		err = printVersion()
+		//バージョン表示のみで終了(Successを表示しない)
+		return nil
 	case DownloadList:
 		//ダウンロードのリスト表示
 		err = golin.PrintGoVersionList()
@@ -126,6 +127,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("run error: %w", err)
 	}
+
+	fmt.Println("Success.")
 	return nil
 }
 
@@ -190,6 +193,6 @@ func printVersion() error {
 	if version == "" || revision == "" || date == "" || build == "" {
 		return fmt.Errorf("version is empty.")
 	}
-	fmt.Printf("golin version %s %s\nBuild Information:%s (%s)", version, build, date, build)
+	fmt.Printf("golin version %s %s\nBuild Information:%s (%s)\n", version, build, date, build)
 	return nil
 }

@@ -18,15 +18,6 @@ const (
 )
 
 //
-// CompileGoSDK is Compile from the latest repository to Create GoSDK
-//
-// Createに"tip"を渡すことで開発用のgotipの実行を行います
-//
-func CompileLatestSDK() error {
-	return Create("tip")
-}
-
-//
 // checkAuthorization is authorization check
 //
 // 引数のパスにリンクが貼れるかをワークでチェック
@@ -214,12 +205,14 @@ func readyPath(dir, v string) (string, error) {
 	_, err := os.Stat(path)
 	//Exist
 	if err == nil {
-		if v == "tip" {
+		if v == CompileSDK {
 			err := os.RemoveAll(path)
 			if err != nil {
 				//開発中実行がこのパスだった場合goを削除できないので無視
 				fmt.Fprintln(os.Stderr, err)
 			}
+			//再度ダウンロード用に設定する
+			v = "tip"
 		} else {
 			return path, nil
 		}
