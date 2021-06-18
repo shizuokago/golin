@@ -128,7 +128,7 @@ func createDownloadCmd(v string) (string, error) {
 	link := fmt.Sprintf("%s/go%s", config.GoGetLink, v)
 
 	// go get golang.org/dl/go{version}
-	cmd := exec.Command("go", "get", link)
+	cmd := exec.Command("go", "install", link)
 	err := runCmd(cmd)
 	if err != nil {
 		return "", err
@@ -251,34 +251,45 @@ func runCmd(cmd *exec.Cmd) error {
 
 func runDownloadCmd(bin string) error {
 
-	fmt.Println("download cmd start")
+	//fmt.Println("download cmd start")
+
 	// $GOPATH/bin/go{version}{.exe} download
 	cmd := exec.Command(bin, "download")
+	w := &downloadWriter{}
+	cmd.Stdout = w
+	cmd.Stderr = w
 
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return xerrors.Errorf("stdout pipe error: %w", err)
-	}
-	err = cmd.Start()
+	err := cmd.Start()
 	if err != nil {
 		return xerrors.Errorf("command start error: %w", err)
 	}
-
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Fprintln(os.Stdout, line)
-		}
-	}()
 
 	err = cmd.Wait()
 	if err != nil {
 		return xerrors.Errorf("command wait error: %w", err)
 	}
 
-	fmt.Println("download cmd end")
+	//fmt.Println("download cmd end")
 	return nil
+}
+
+type downloadWriter struct {
+}
+
+func (w *downloadWriter) Write(b []byte) (int, error) {
+	line := string(b)
+
+	if strings.Index(line, "Downloaded") != -1 {
+		if strings.Index(line, "\n") != -1 {
+			line = line[0 : len(line)-1]
+		}
+		fmt.Fprint(os.Stdout, "\r"+line)
+	} else if strings.Index(line, "Unpacking") != -1 {
+		fmt.Fprint(os.Stdout, "\n"+line)
+	} else {
+		fmt.Fprint(os.Stderr, line)
+	}
+	return len(b), nil
 }
 
 //
