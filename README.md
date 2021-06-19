@@ -31,37 +31,37 @@ a symbolic link calld "current" is created in "path" with the latest version.
 
 ```
 /usr/local/go
-       |-1.15.6
-       |-current -> 1.15.6
+       |-1.16.5
+       |-current -> 1.16.5
 ```
 
 you set the environment variable "GOROOT" to "/usr/local/go/current"
 
 # examples
 
-GOROOT = /usr/local/go/current -> 1.15.6
+GOROOT = /usr/local/go/current -> 1.16.5
 
 ```
 /usr/local/go/current -
-       |-1.15.6
-       |-current -> 1.15.6
+       |-1.16.5
+       |-current -> 1.16.5
 ```
 
-    $ golin 1.16
+    $ golin 1.17beta1
 
 ```
 /usr/local/go/current -
-      |-1.15.6
-      |-1.16
-      |-current -> 1.16
+      |-1.16.5
+      |-1.17
+      |-current -> 1,17
 ```
 
 If it does not exist, download it and switch it.
 
 Beta and Candidate Release are also available for install.
 
-e.g.) golin 1.16beta1
-      golin 1.16rc1
+e.g.) golin 1.17beta1
+      golin 1.17rc1
 
 # super user
 
