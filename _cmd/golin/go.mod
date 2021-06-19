@@ -1,4 +1,4 @@
-module main
+module github.com/shizuokago/golin/_cmd/golin/v2
 
 go 1.17
 
