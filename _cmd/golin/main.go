@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/shizuokago/golin"
-	"github.com/shizuokago/golin/config"
+	"github.com/shizuokago/golin/v2"
+	"github.com/shizuokago/golin/v2/config"
 )
 
 var (
