@@ -13,7 +13,7 @@ Download the golin that suits your platform.
 
 ## already Go Runtime installed.
 
-    go get github.com/shizuokago/golin/_cmd/golin
+    go get github.com/shizuokago/golin/_cmd/golin@v2.0.1
 
 GOBIN(GOPATH/bin)に配布されます。GOBINにPATHが通っていることを確認してください。
 
