@@ -119,7 +119,7 @@ func getSDKPath(v string) string {
 // createDownloadCmd is downlod command download(go get)
 //
 // Goをダウンロードするコマンドである
-// golang.org/dl/goX.x.x をgo getして取得してきます
+// golang.org/dl/goX.x.x をinstallして取得してきます
 // そのままGOPATHの位置でinstallされ、コマンドが作成されますので
 // そのコマンド名も返します
 //
@@ -258,6 +258,7 @@ func runDownloadCmd(bin string) error {
 	w := &downloadWriter{}
 	cmd.Stdout = w
 	cmd.Stderr = w
+	cmd.Stdin = os.Stdin
 
 	err := cmd.Start()
 	if err != nil {
