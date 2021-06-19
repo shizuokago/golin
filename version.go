@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/shizuokago/golin/config"
+	"github.com/shizuokago/golin/v2/config"
 	"golang.org/x/xerrors"
 )
 
