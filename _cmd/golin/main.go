@@ -191,6 +191,7 @@ func Usage() {
 
 func printVersion() error {
 	if version == "" || revision == "" || date == "" || build == "" {
+		fmt.Println("golin development version")
 		return fmt.Errorf("version is empty.")
 	}
 	fmt.Printf("golin version %s %s\nBuild Information:%s (%s)\n", version, build, date, build)
