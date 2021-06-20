@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shizuokago/v2/golin"
+	"github.com/shizuokago/golin/v2"
 )
 
 func init() {
