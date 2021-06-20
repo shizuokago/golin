@@ -13,7 +13,7 @@ Download the golin that suits your platform.
 
 ## already Go Runtime installed.
 
-    go get github.com/shizuokago/golin/cmd/golin@main
+    go get github.com/shizuokago/golin/v2/_cmd/golin@latest
 
 GOBIN(GOPATH/bin)に配布されます。GOBINにPATHが通っていることを確認してください。
 
@@ -83,3 +83,11 @@ Because there is a possibility that environment variables are not inherited by s
 Deafaults env_keep += "GOROOT"
 ```
 
+
+# The Version of this repository
+
+I've been using "semantic versioning" before Modules, 
+but V2 didn't work, probably because I didn't use Modules at "V0". 
+Therefore, 
+the latest version of V0 is "BeforeModules-0.9.0" 
+and the latest version of V1 is "BeforeModules-1.0.0".
