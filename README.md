@@ -84,10 +84,15 @@ Deafaults env_keep += "GOROOT"
 ```
 
 
-# The Version of this repository
+# Problem installing v2 with "Modules"
 
-I've been using "semantic versioning" before Modules, 
-but V2 didn't work, probably because I didn't use Modules at "V0". 
-Therefore, 
-the latest version of V0 is "BeforeModules-0.9.0" 
-and the latest version of V1 is "BeforeModules-1.0.0".
+It is known to add v2 to the package "go.mod", but when installing the command, it fits the phenomenon that the package cannot be found.
+
+This is a symptom that only happens if the command is installed in a different location, and I think few packages are currently facing this issue.
+
+Only found
+
+  https://github.com/golang/appengine/tree/master/v2
+
+I tried to refer to the v2 directory of.
+
