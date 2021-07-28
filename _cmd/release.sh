@@ -18,7 +18,7 @@ fi
 # linux     amd64
 
 # set -e
-Version="2.0.0"
+Version="2.0.1"
 Revision=$(git rev-parse --short HEAD)
 Date=$(date -u -R)
 

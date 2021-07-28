@@ -13,7 +13,7 @@ Download the golin that suits your platform.
 
 ## already Go Runtime installed.
 
-    go get github.com/shizuokago/golin/_cmd/golin
+    go get github.com/shizuokago/golin/v2/_cmd/golin@latest
 
 GOBIN(GOPATH/bin)に配布されます。GOBINにPATHが通っていることを確認してください。
 
@@ -82,4 +82,17 @@ Because there is a possibility that environment variables are not inherited by s
 ```
 Deafaults env_keep += "GOROOT"
 ```
+
+
+# Problem installing v2 with "Modules"
+
+It is known to add v2 to the package "go.mod", but when installing the command, it fits the phenomenon that the package cannot be found.
+
+This is a symptom that only happens if the command is installed in a different location, and I think few packages are currently facing this issue.
+
+Only found
+
+  https://github.com/golang/appengine/tree/master/v2
+
+I tried to refer to the v2 directory of.
 

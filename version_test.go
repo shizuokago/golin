@@ -3,7 +3,7 @@ package golin_test
 import (
 	"testing"
 
-	"github.com/shizuokago/golin"
+	"github.com/shizuokago/golin/v2"
 )
 
 func TestVersion(t *testing.T) {

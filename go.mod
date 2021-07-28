@@ -1,4 +1,4 @@
-module github.com/shizuokago/golin
+module github.com/shizuokago/golin/v2
 
 go 1.12
 
