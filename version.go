@@ -102,30 +102,46 @@ func (v *Version) setRevision(r string) error {
 	return err
 }
 
-// Version less
-func (src Version) Less(target *Version) bool {
+func (src Version) Compare(target *Version) int {
 
 	if src.mean == MeanError {
-		return true
+		return -1
 	} else if target.mean == MeanError {
-		return false
+		return 1
 	}
 
-	if src.v != target.v {
-		return src.v < target.v
+	if src.v > target.v {
+		return 1
+	} else if src.v < target.v {
+		return -1
 	}
 
-	if src.r != target.r {
-		return src.r < target.r
+	if src.r > target.r {
+		return 1
+	} else if src.r < target.r {
+		return -1
 	}
 
-	//定数化したので判定できる
-	if src.mean != target.mean {
-		return src.mean > target.mean
-	} else {
-		return src.m < target.m
+	if src.mean > target.mean {
+		return 1
+	} else if src.mean < target.mean {
+		return -1
 	}
 
+	if src.m > target.m {
+		return 1
+	} else if src.m < target.m {
+		return -1
+	}
+
+	return 0
+}
+
+// Version less
+func (src Version) Less(target *Version) bool {
+	if src.Compare(target) < 0 {
+		return true
+	}
 	return false
 }
 

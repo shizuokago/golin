@@ -17,6 +17,8 @@ const (
 	workDirectory = "golin_work" //権限確認用のディレクトリ名
 )
 
+var currentVersion *Version
+
 //
 // checkAuthorization is authorization check
 //
@@ -126,9 +128,16 @@ func getSDKPath(v string) string {
 func createDownloadCmd(v string) (string, error) {
 
 	link := fmt.Sprintf("%s/go%s", config.GoGetLink, v)
+	sub := "get"
+
+	if currentVersion != nil &&
+		currentVersion.Compare(NewVersion("1.16")) >= 0 {
+		sub = "install"
+		link += "@latest"
+	}
 
 	// go get golang.org/dl/go{version}
-	cmd := exec.Command("go", "install", link)
+	cmd := exec.Command("go", sub, link)
 	err := runCmd(cmd)
 	if err != nil {
 		return "", err
@@ -313,15 +322,30 @@ func GetGoEnv(key string) string {
 //
 // go versionを実行します
 //
-func printGoVersion(prefix string) {
+func printGoVersion(prefix string) *Version {
+
 	out, err := exec.Command("go", "version").Output()
 	if err != nil {
-		return
+		return nil
 	}
 
 	ver := strings.Replace(string(out), "\n", "", -1)
 
 	fmt.Fprintln(os.Stdout, prefix, ver)
+
+	//go version go1.17beta1 windows/amd64
+	sl := strings.Split(ver, " ")
+	if len(sl) <= 2 {
+		return nil
+	}
+	//go1.17beta1
+	vb := sl[2]
+
+	if len(vb) <= 2 {
+		return nil
+	}
+
+	return NewVersion(vb[2:])
 }
 
 //

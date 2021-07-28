@@ -29,7 +29,7 @@ func Create(v string) error {
 	}
 
 	//設定前のGoのバージョン表示
-	printGoVersion("Before:")
+	currentVersion = printGoVersion("Before:")
 
 	//指定バージョンでパスを作成
 	path, err := readyPath(root, v)
