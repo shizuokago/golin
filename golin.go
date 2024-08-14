@@ -3,6 +3,7 @@ package golin
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,18 +13,16 @@ import (
 	"golang.org/x/xerrors"
 )
 
-//定数
+// 定数
 const (
 	workDirectory = "golin_work" //権限確認用のディレクトリ名
 )
 
 var currentVersion *Version
 
-//
 // checkAuthorization is authorization check
 //
 // 引数のパスにリンクが貼れるかをワークでチェック
-//
 func checkAuthorization(path string) error {
 
 	work := filepath.Join(path, "."+workDirectory)
@@ -43,13 +42,11 @@ func checkAuthorization(path string) error {
 	return nil
 }
 
-//
 // Function getRoot is return Work Directory Path
 //
 // この関数は処理対象のディレクトリを返します。
 // 具体的には現在のGOROOTの上の階層を返します。
 // GOROOTが存在しない場合はエラーとなります
-//
 func getRoot(ver string) (string, error) {
 
 	goroot := os.Getenv("GOROOT")
@@ -92,23 +89,19 @@ Is it OK?[Y/n]
 	return root, nil
 }
 
-//
 // GetGoPath is return GOPATH
 //
 // GOPATHの値を返しますが、
 // 設定がない場合もあるのでos.Getenv()ではなくgo env からの値を取得
-//
 func GetGoPath() string {
 	return GetGoEnv("GOPATH")
 }
 
-//
 // getSDKPath is return Downloaded path
 //
 // golang.org/dl/goX.x.x のコマンドにdownloadした場合のパスを作成して返します
 // golang.org/dl/internal/version.go の仕様が変更になった場合、
 // 変更する必要があります
-//
 func getSDKPath(v string) string {
 	home := getHome()
 	if home == "" {
@@ -117,14 +110,12 @@ func getSDKPath(v string) string {
 	return filepath.Join(home, "sdk", "go"+v)
 }
 
-//
 // createDownloadCmd is downlod command download(go get)
 //
 // Goをダウンロードするコマンドである
 // golang.org/dl/goX.x.x をinstallして取得してきます
 // そのままGOPATHの位置でinstallされ、コマンドが作成されますので
 // そのコマンド名も返します
-//
 func createDownloadCmd(v string) (string, error) {
 
 	link := fmt.Sprintf("%s/go%s", config.GoGetLink, v)
@@ -150,12 +141,10 @@ func createDownloadCmd(v string) (string, error) {
 	return genPath, nil
 }
 
-//
 // Download is Go download
 //
 // Go言語をダウンロードします
 // 戻り値はダウンロードして来たディレクトリを返します
-//
 func Download(v string) (string, error) {
 
 	//$GOPATH/bin/go{version}{.exe}
@@ -174,7 +163,6 @@ func Download(v string) (string, error) {
 	return getSDKPath(v), nil
 }
 
-//
 // readyLink is remove symbolic link
 //
 // シンボリックリンクは存在する場合の
@@ -183,7 +171,6 @@ func Download(v string) (string, error) {
 // 問い合わせしたりする処理がありません
 //
 // BUG(secondarykey): 作成に失敗した場合のロールバックがない
-//
 func readyLink(dir string) (string, error) {
 
 	conf := config.Get()
@@ -201,13 +188,11 @@ func readyLink(dir string) (string, error) {
 	return link, nil
 }
 
-//
 // readyPath is golang version path
 //
 // 対象バージョンのパスを確認し、
 // 存在しない場合はダウンロードを行って準備する
 // 存在するバージョンの場合はそのままパスを返す
-//
 func readyPath(dir, v string) (string, error) {
 
 	path := filepath.Join(dir, v)
@@ -234,19 +219,75 @@ func readyPath(dir, v string) (string, error) {
 	}
 
 	//Download SDK Rename
-	err = os.Rename(sdk+string(filepath.Separator), path+string(filepath.Separator))
+	err = copyDir(sdk, path)
 	if err != nil {
 		return "", xerrors.Errorf("rename error: %w", err)
+	}
+
+	err = os.RemoveAll(sdk)
+	if err != nil {
+		return "", xerrors.Errorf("os.RemoveAll() error: %w", err)
 	}
 	return path, nil
 }
 
-//
+// original rename
+// os.Rename(src, dst)
+// rename C:\Users\secon\sdk\go1.23.0\ D:\Go\Runtimes\1.23.0\: The system cannot move the file to a different disk drive.
+func copyDir(src, dst string) error {
+	os.Mkdir(dst, 0666)
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return xerrors.Errorf("os.ReadDir() error: %w", err)
+	}
+
+	for _, f := range entries {
+
+		n := f.Name()
+		nsrc := filepath.Join(src, n)
+		ndst := filepath.Join(dst, n)
+
+		if f.IsDir() {
+			err = copyDir(nsrc, ndst)
+			if err != nil {
+				return xerrors.Errorf("copyDir() error: %w", err)
+			}
+		} else {
+			err := copyFile(nsrc, ndst)
+			if err != nil {
+				return xerrors.Errorf("copyFile() error: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+func copyFile(src, dst string) error {
+
+	fp, err := os.Open(src)
+	if err != nil {
+		return xerrors.Errorf("os.Open() error: %w", err)
+	}
+	defer fp.Close()
+
+	f, err := os.Create(dst)
+	if err != nil {
+		return xerrors.Errorf("os.Create() error: %w", err)
+	}
+	defer f.Close()
+
+	_, err := io.Copy(f, fp)
+	if err != nil {
+		return xerrors.Errorf("io.Copy() error: %w", err)
+	}
+
+	return nil
+}
+
 // runCmd is command running
 //
 // 実際コマンドを実行する処理
 // 標準出力等を一括管理する為に関数化を行った
-//
 func runCmd(cmd *exec.Cmd) error {
 
 	cmd.Stdout = os.Stdout
@@ -302,13 +343,11 @@ func (w *downloadWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-//
 // GetGoEnv is go env {key} command
 //
 // go envを引数で実行します
 //
 // TODO(secondarykey) : change replaceall(1.12 after,,,)
-//
 func GetGoEnv(key string) string {
 	out, err := exec.Command("go", "env", key).Output()
 	if err != nil {
@@ -317,11 +356,9 @@ func GetGoEnv(key string) string {
 	return strings.Replace(string(out), "\n", "", -1)
 }
 
-//
 // printGoVersion is current go command version
 //
 // go versionを実行します
-//
 func printGoVersion(prefix string) *Version {
 
 	out, err := exec.Command("go", "version").Output()
@@ -348,11 +385,9 @@ func printGoVersion(prefix string) *Version {
 	return NewVersion(vb[2:])
 }
 
-//
 // existsGo is go command exists
 //
 // goコマンドが存在するかを見ます
-//
 func existGo() bool {
 	out, err := exec.Command("go", "version").Output()
 	if err != nil {
