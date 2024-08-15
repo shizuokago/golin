@@ -1,105 +1,110 @@
 package golin
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/shizuokago/golin/v2/config"
 	"golang.org/x/xerrors"
 )
+
+type VersionList []*Version
+
+func (list VersionList) Exists(v *Version) bool {
+	for _, src := range list {
+		if src.Equals(v) {
+			return true
+		}
+	}
+	return false
+}
 
 // Version is r.v.m version
 type Version struct {
 	v    int
 	r    int
-	mean VersionMean
 	m    int
-	src  string
+	mean VersionMean
+
+	src string
 }
 
 type VersionMean int
 
 const (
-	Major VersionMean = iota
-	RC
-	Beta
-	MeanError
+	MeanError VersionMean = iota
+	MeanBeta
+	MeanRC
+	MeanNone
 )
 
-func (m VersionMean) String() string {
-	switch m {
-	case Major:
-		return "Major"
-	case RC:
-		return "rc"
-	case Beta:
-		return "beta"
-	case MeanError:
-		return "Version Mean Error"
-	}
-	return "error(Mean not found)"
-}
-
 // Parse version string
-// src = "1.12.1" R,V,M
-// mean = major,rc,beta
+// src = "1.12.1" v,r,m
+// mean = none,rc,beta (error)
 func NewVersion(src string) *Version {
+
 	v := &Version{
-		mean: Major,
+		mean: MeanNone,
 		src:  src,
 	}
-	var err error
-	slice := strings.Split(src, ".")
-	if len(slice) > 0 {
-		//バージョン部分を数値化
-		v.v, err = strconv.Atoi(slice[0])
-		//エラーがない場合
-		if len(slice) > 1 && err == nil {
-			//リビジョンを設定
-			r := slice[1]
-			err = v.setRevision(r)
-			if len(slice) > 2 && err == nil {
-				v.m, err = strconv.Atoi(slice[2])
-			}
+	v.v, v.r, v.m = -1, -1, -1
+
+	base := src
+	//rc,betaを確認
+	idx := strings.Index(src, "rc")
+	if idx != -1 {
+		v.mean = MeanRC
+		base = src[:idx]
+	} else {
+		idx = strings.Index(src, "beta")
+		if idx != -1 {
+			v.mean = MeanBeta
+			base = src[:idx]
 		}
 	}
 
+	var err error
+	s := strings.Split(base, ".")
+
+	//バージョン部分を数値化
+	v.v, err = strconv.Atoi(s[0])
 	if err != nil {
 		v.mean = MeanError
 	}
+
+	if len(s) > 1 {
+		v.r, err = strconv.Atoi(s[1])
+		if err != nil {
+			v.mean = MeanError
+		}
+	}
+
+	if len(s) > 2 {
+		v.m, err = strconv.Atoi(s[2])
+		if err != nil {
+			v.mean = MeanError
+		}
+	}
+
+	if len(s) >= 4 {
+		v.mean = MeanError
+	}
+
 	return v
 }
 
-// setRevision
-func (v *Version) setRevision(r string) error {
-	key := Major
-	if strings.Index(r, "beta") != -1 {
-		key = Beta
-	} else if strings.Index(r, "rc") != -1 {
-		key = RC
-	}
+func (v Version) IsError() bool {
+	return v.mean == MeanError
+}
 
-	var err error
-	if key == Major {
-		v.r, err = strconv.Atoi(r)
-	} else {
-		v.mean = key
-		slice := strings.Split(r, key.String())
-		if len(slice) == 2 {
-			v.r, err = strconv.Atoi(slice[0])
-			if err == nil {
-				v.m, err = strconv.Atoi(slice[1])
-			}
-		}
-	}
-
-	if err != nil {
-		v.mean = MeanError
-	}
-	return err
+func (v Version) Stable() bool {
+	return v.mean == MeanNone
 }
 
 func (src Version) Compare(target *Version) int {
@@ -122,18 +127,23 @@ func (src Version) Compare(target *Version) int {
 		return -1
 	}
 
-	if src.mean > target.mean {
-		return 1
-	} else if src.mean < target.mean {
-		return -1
-	}
-
 	if src.m > target.m {
 		return 1
 	} else if src.m < target.m {
 		return -1
 	}
 
+	if src.mean > target.mean {
+		return 1
+	} else if src.mean < target.mean {
+		return -1
+	}
+
+	if src.src > target.src {
+		return 1
+	} else if src.src < target.src {
+		return -1
+	}
 	return 0
 }
 
@@ -145,56 +155,63 @@ func (src Version) Less(target *Version) bool {
 	return false
 }
 
+func (src Version) Equals(target *Version) bool {
+	return src.Compare(target) == 0
+}
+
+func (v Version) Minor() string {
+	return fmt.Sprintf("%d.%d", v.v, v.r)
+}
+
+func (v Version) Revision() string {
+
+	m := v.Minor()
+	r := strings.Replace(v.src, m, "", 1)
+
+	if len(r) == 0 {
+		return "-"
+	}
+
+	if r[0] == '.' {
+		return r[1:]
+	}
+	return r
+}
+
+func (v Version) Source() string {
+	return v.src
+}
+
 func (v Version) String() string {
 	return v.src
 }
 
-// GitHubのバージョン解析用のタグ
-const (
-	firstTag  = "div.Box-row"
-	secondTag = "a.js-navigation-open"
-)
+// dl ページのjsonからバージョンリストを取得
+type GoVersion struct {
+	Version string `json:"version"`
+	Stable  bool   `json:"stable"`
+}
 
-// GitHubページ(dl)からバージョンを確認して、
-// 可能なバージョンのスライスを取得
 func createVersionList() ([]*Version, error) {
 
-	doc, err := goquery.NewDocument(config.GitHubDownloadPage)
+	//https://go.dev/dl/?mode=json&include=all -> 全部
+	resp, err := http.Get(config.GoDevelopDownloadPage)
+	defer resp.Body.Close()
+
+	var vers []GoVersion
+	err = json.NewDecoder(resp.Body).Decode(&vers)
 	if err != nil {
-		return nil, xerrors.Errorf("error github page: %w", err)
+		return nil, xerrors.Errorf("json.Decode() error: %w", err)
 	}
 
-	//main#js-repo-pjax-container
-	//div.Box
-
-	boxRow := doc.Find(firstTag)
-	if boxRow.Length() == 0 {
-		return nil, xerrors.Errorf("Box-row is empty")
+	versionList := make([]string, 0, len(vers))
+	for _, ver := range vers {
+		if strings.Index(ver.Version, "go") == 0 {
+			versionList = append(versionList, ver.Version[2:])
+		}
 	}
 
-	versionList := make([]string, 0, 100)
-	errs := make([]error, 0)
-
-	boxRow.Each(func(_ int, s *goquery.Selection) {
-		link := s.Find(secondTag)
-		if link.Length() == 0 {
-			errs = append(errs, fmt.Errorf("link(a.js-navigation-open) not found."))
-			return
-		}
-		name := link.First().Text()
-		if isVersion(name) {
-			versionList = append(versionList, name[2:])
-		}
-	})
-
-	if len(errs) > 0 {
-		msg := "link list error:"
-		for _, elm := range errs {
-			msg += "\n    " + elm.Error()
-		}
-		return nil, fmt.Errorf(msg)
-	}
-
+	//errs := make([]error, 0)
 	if len(versionList) <= 0 {
 		return nil, fmt.Errorf("version not found.")
 	}
@@ -211,25 +228,7 @@ func createVersionList() ([]*Version, error) {
 	return v, nil
 }
 
-//バージョンを表すか？
-func isVersion(name string) bool {
-
-	if len(name) < 3 {
-		return false
-	}
-
-	if strings.Index(name, "go") != 0 {
-		return false
-	}
-
-	if _, err := strconv.Atoi(name[2:3]); err != nil {
-		return false
-	}
-
-	return true
-}
-
-//最新のバージョンを取得
+// 最新のバージョンを取得
 func getLatestVersion() (*Version, error) {
 
 	list, err := createVersionList()
@@ -242,9 +241,30 @@ func getLatestVersion() (*Version, error) {
 	})
 
 	for _, elm := range list {
-		if elm.mean == Major {
+		if elm.mean == MeanNone {
 			return elm, nil
 		}
 	}
 	return nil, fmt.Errorf("Major version not found.")
+}
+
+func existsVersionList() VersionList {
+
+	parent := filepath.Dir(os.Getenv("GOROOT"))
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		return nil
+	}
+
+	var exists []*Version
+	for _, d := range entries {
+		if !d.IsDir() {
+			continue
+		}
+		v := NewVersion(d.Name())
+		if !v.IsError() {
+			exists = append(exists, v)
+		}
+	}
+	return exists
 }

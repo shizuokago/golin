@@ -235,7 +235,9 @@ func readyPath(dir, v string) (string, error) {
 // os.Rename(src, dst)
 // rename C:\Users\secon\sdk\go1.23.0\ D:\Go\Runtimes\1.23.0\: The system cannot move the file to a different disk drive.
 func copyDir(src, dst string) error {
+
 	os.Mkdir(dst, 0666)
+
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return xerrors.Errorf("os.ReadDir() error: %w", err)
@@ -276,7 +278,7 @@ func copyFile(src, dst string) error {
 	}
 	defer f.Close()
 
-	_, err := io.Copy(f, fp)
+	_, err = io.Copy(f, fp)
 	if err != nil {
 		return xerrors.Errorf("io.Copy() error: %w", err)
 	}

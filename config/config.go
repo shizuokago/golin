@@ -9,10 +9,14 @@ type Config struct {
 }
 
 const (
-	DefaultLinkName    = "current"                      //作成するリンク名
-	GoGetLink          = "golang.org/dl"                //ダウンロード時のリンク先
-	GitHubDownloadPage = "https://github.com/golang/dl" //GitHub上のバージョンリスト
-	GolangDownloadPage = "https://golang.org/dl"        //install時のダウンロード
+	DefaultLinkName    = "current"               //作成するリンク名
+	GoGetLink          = "golang.org/dl"         //ダウンロード時のリンク先
+	GolangDownloadPage = "https://golang.org/dl" //install時のダウンロード
+
+	// deprecated:
+	//GitHubDownloadPage = "https://github.com/golang/dl" //GitHub上のバージョンリスト
+
+	GoDevelopDownloadPage = "https://go.dev/dl/?mode=json&include=all"
 )
 
 var gConf *Config = nil

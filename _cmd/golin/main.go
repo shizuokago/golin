@@ -1,4 +1,4 @@
-//Golin Command
+// Golin Command
 package main
 
 import (
@@ -19,19 +19,20 @@ var (
 
 var (
 	link string
+	all  bool
 )
 
 // Initialize golin command
 //
 // オプションに-dでリンク名を変更できるようにし、Usageを設定する
 func init() {
+	flag.BoolVar(&all, "all", false, "print all version list")
 	flag.StringVar(&link, "d", config.DefaultLinkName, "symbolic link name")
 	flag.Usage = Usage
 }
 
 type Cmd string
 
-//
 // golinコマンド
 //
 // version  バージョン表示
@@ -39,7 +40,6 @@ type Cmd string
 // list     ダウンロードできるバージョンのリストを表示
 // dev      最新の開発バージョンを取得
 // compress コマンド等の圧縮(リリース用)
-//
 const (
 	Version         Cmd = "version"
 	Install         Cmd = "install"
@@ -50,9 +50,7 @@ const (
 	ChangeVersion Cmd = ""
 )
 
-//
 // This golin command main
-//
 func main() {
 
 	err := run()
@@ -92,7 +90,7 @@ func run() error {
 		return nil
 	case DownloadList:
 		//ダウンロードのリスト表示
-		err = golin.PrintGoVersionList()
+		err = golin.PrintGoVersionList(all)
 	case Development:
 		//開発バージョンのコンパイル
 		err = golin.CompileLatestSDK()
@@ -125,7 +123,7 @@ func run() error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("run error: %w", err)
+		return fmt.Errorf("subcommand error: %w", err)
 	}
 
 	fmt.Println("Success.")
