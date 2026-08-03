@@ -196,7 +196,14 @@ func createVersionList() ([]*Version, error) {
 
 	//https://go.dev/dl/?mode=json&include=all -> 全部
 	resp, err := http.Get(config.GoDevelopDownloadPage)
+	if err != nil {
+		return nil, xerrors.Errorf("http.Get() error: %w", err)
+	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("version list status error: %s", resp.Status)
+	}
 
 	var vers []GoVersion
 	err = json.NewDecoder(resp.Body).Decode(&vers)
