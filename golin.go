@@ -199,20 +199,25 @@ func readyLink(dir string) (string, error) {
 // 存在するバージョンの場合はそのままパスを返す
 func readyPath(dir, v string) (string, error) {
 
+	//devの場合、常に最新のビルドを行う
+	//配置先はtipとなり、golin tip と同じディレクトリを共有する
+	rebuild := false
+	if v == CompileSDK {
+		v = TipVersion
+		rebuild = true
+	}
+
 	path := filepath.Join(dir, v)
 	_, err := os.Stat(path)
 	//Exist
 	if err == nil {
-		if v == CompileSDK {
-			err := os.RemoveAll(path)
-			if err != nil {
-				//開発中実行がこのパスだった場合goを削除できないので無視
-				fmt.Fprintln(os.Stderr, err)
-			}
-			//再度ダウンロード用に設定する
-			v = "tip"
-		} else {
+		if !rebuild {
 			return path, nil
+		}
+		err = os.RemoveAll(path)
+		if err != nil {
+			//開発中実行がこのパスだった場合goを削除できないので無視
+			fmt.Fprintln(os.Stderr, err)
 		}
 	}
 
