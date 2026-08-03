@@ -85,8 +85,9 @@ func run() error {
 	switch cmd {
 	case Version:
 		//コマンドのバージョン表示
-		err = printVersion()
 		//バージョン表示のみで終了(Successを表示しない)
+		//開発時はビルド情報が埋め込まれていない為、エラーは無視する
+		printVersion()
 		return nil
 	case DownloadList:
 		//ダウンロードのリスト表示
@@ -192,6 +193,6 @@ func printVersion() error {
 		fmt.Println("golin development version")
 		return fmt.Errorf("version is empty.")
 	}
-	fmt.Printf("golin version %s %s\nBuild Information:%s (%s)\n", version, build, date, build)
+	fmt.Printf("golin version %s %s\nBuild Information:%s (%s)\n", version, revision, date, build)
 	return nil
 }

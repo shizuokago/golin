@@ -35,7 +35,7 @@ func checkAuthorization(path string) error {
 	link := filepath.Join(path, "_"+workDirectory+"_")
 	err = os.Symlink(work, link)
 	if err != nil {
-		return xerrors.Errorf("シンボリックリンクの作成に失敗しました。", err)
+		return xerrors.Errorf("シンボリックリンクの作成に失敗しました。: %w", err)
 	}
 	defer os.Remove(link)
 
@@ -59,10 +59,11 @@ func getRoot(ver string) (string, error) {
 
 	root := filepath.Dir(goroot)
 	now := filepath.Base(goroot)
-	idx := strings.Index(goroot, link)
 
 	//最後がリンク名と同一かを見る
-	if idx != len(goroot)-len(link) {
+	//strings.Index()では最初の出現位置を見てしまう為、
+	//パスの途中にリンク名を含む場合に誤判定する
+	if now != link {
 		fmt.Fprintf(os.Stdout, `
 This command creates the Go SDK within the current GOROOT parent directory. 
 It is recommended to specify a dedicated directory.
