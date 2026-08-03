@@ -121,7 +121,11 @@ func createDownloadCmd(v string) (string, error) {
 	link := fmt.Sprintf("%s/go%s", config.GoGetLink, v)
 	sub := "get"
 
-	if currentVersion != nil &&
+	//1.16未満であると確定した場合のみ go get を使用する
+	//バージョンが取得/解析できなかった場合は新しいGoとみなす
+	//(go get でのコマンドインストールは既に廃止されている為)
+	if currentVersion == nil ||
+		currentVersion.IsError() ||
 		currentVersion.Compare(NewVersion("1.16")) >= 0 {
 		sub = "install"
 		link += "@latest"
@@ -397,7 +401,17 @@ func printGoVersion(prefix string) *Version {
 
 	fmt.Fprintln(os.Stdout, prefix, ver)
 
+	return parseGoVersion(ver)
+}
+
+// parseGoVersion is go version output parsing
+//
+// go versionの出力からバージョンを取得します
+// 解析できない場合はnilを返します
+func parseGoVersion(ver string) *Version {
+
 	//go version go1.17beta1 windows/amd64
+	//go version devel go1.25-0123456789 windows/amd64
 	sl := strings.Split(ver, " ")
 	if len(sl) <= 2 {
 		return nil
@@ -405,25 +419,25 @@ func printGoVersion(prefix string) *Version {
 	//go1.17beta1
 	vb := sl[2]
 
-	if len(vb) <= 2 {
+	//開発版(gotip)の場合、バージョンは次の要素になる
+	if vb == "devel" {
+		if len(sl) <= 3 {
+			return nil
+		}
+		vb = sl[3]
+	}
+
+	if len(vb) <= 2 || !strings.HasPrefix(vb, "go") {
 		return nil
 	}
 
-	return NewVersion(vb[2:])
-}
+	//go1.25-0123456789 のコミット情報を落とす
+	num := vb[2:]
+	if idx := strings.Index(num, "-"); idx != -1 {
+		num = num[:idx]
+	}
 
-// existsGo is go command exists
-//
-// goコマンドが存在するかを見ます
-func existGo() bool {
-	out, err := exec.Command("go", "version").Output()
-	if err != nil {
-		return false
-	}
-	if out != nil && len(out) != 0 {
-		return true
-	}
-	return false
+	return NewVersion(num)
 }
 
 func printSetting(root, version string) {
