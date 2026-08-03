@@ -126,8 +126,6 @@ func DecompressURL(url string, dir string) error {
 	default:
 		return fmt.Errorf("Decompress NotSupported: %s", url)
 	}
-
-	return fmt.Errorf("Not Reachable.")
 }
 
 func decompressZip(r io.Reader, dir string) error {
@@ -154,6 +152,9 @@ func decompressZip(r io.Reader, dir string) error {
 	for _, f := range zr.File {
 
 		//goを変換
+		if len(f.Name) < 2 {
+			continue
+		}
 		fn := filepath.Clean(dir + f.Name[2:])
 
 		info := f.FileInfo()
@@ -224,7 +225,14 @@ func decompressTarGz(r io.Reader, dir string) error {
 		if errors.Is(err, io.EOF) {
 			break
 		}
+		if err != nil {
+			return xerrors.Errorf("tar Next() error: %w", err)
+		}
 
+		//"go/"以下を対象とする
+		if len(th.Name) < 2 {
+			continue
+		}
 		name := th.Name[2:]
 		//goを変換
 		fn := filepath.Clean(dir + name)
