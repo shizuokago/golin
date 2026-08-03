@@ -42,7 +42,7 @@ func Install(path string, ver string) error {
 	}
 
 	//currentを作成
-	link, err := readyLink(path)
+	link, restore, err := readyLink(path)
 	if err != nil {
 		return xerrors.Errorf("readyLink() error: %w", err)
 	}
@@ -50,6 +50,10 @@ func Install(path string, ver string) error {
 	//シンボリックリンクを作成
 	err = os.Symlink(dp, link)
 	if err != nil {
+		//失敗するとGOROOTが存在しない状態になる為、元のリンクに戻す
+		if rerr := restore(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "リンクの復元に失敗しました。: %v\n", rerr)
+		}
 		return xerrors.Errorf("symlink: %w", err)
 	}
 

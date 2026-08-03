@@ -1,6 +1,7 @@
 package golin
 
 import (
+	"fmt"
 	"os"
 
 	"golang.org/x/xerrors"
@@ -38,7 +39,7 @@ func Create(v string) error {
 	}
 
 	//シンボリックを準備
-	link, err := readyLink(root)
+	link, restore, err := readyLink(root)
 	if err != nil {
 		return xerrors.Errorf("ready link: %w", err)
 	}
@@ -46,6 +47,10 @@ func Create(v string) error {
 	//シンボリックリンクを作成
 	err = os.Symlink(path, link)
 	if err != nil {
+		//失敗するとGOROOTが存在しない状態になる為、元のリンクに戻す
+		if rerr := restore(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "リンクの復元に失敗しました。: %v\n", rerr)
+		}
 		return xerrors.Errorf("symlink: %w", err)
 	}
 

@@ -174,22 +174,39 @@ func Download(v string) (string, error) {
 // 現状初回起動時にシンボリックリンクがない場合に
 // 問い合わせしたりする処理がありません
 //
-// BUG(secondarykey): 作成に失敗した場合のロールバックがない
-func readyLink(dir string) (string, error) {
+// 2つめの戻り値は削除したリンクを復元する関数です
+// リンクの作成に失敗するとGOROOTが存在しない状態になる為、
+// 呼び出し側で復元を行ってください
+// エラーを返す場合、復元関数はnilになります
+func readyLink(dir string) (string, func() error, error) {
 
 	conf := config.Get()
 
 	link := filepath.Join(dir, conf.LinkName)
+
+	//復元対象がない場合は何もしない
+	restore := func() error {
+		return nil
+	}
+
 	//symbliclink
 	if _, err := os.Lstat(link); err == nil {
+		//リンク先を保持しておく
+		//シンボリックリンク以外(通常のディレクトリ等)の場合は復元できない
+		if org, lerr := os.Readlink(link); lerr == nil {
+			restore = func() error {
+				return os.Symlink(org, link)
+			}
+		}
+
 		err = os.Remove(link)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 	} else {
 		//???
 	}
-	return link, nil
+	return link, restore, nil
 }
 
 // readyPath is golang version path
