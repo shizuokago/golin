@@ -31,6 +31,9 @@ type Version struct {
 	r    int
 	m    int
 	mean VersionMean
+	//beta,rcの連番(存在しない場合は-1)
+	//文字列比較ではbeta10 < beta9になってしまう為に保持する
+	pre int
 
 	src string
 }
@@ -53,7 +56,7 @@ func NewVersion(src string) *Version {
 		mean: MeanNone,
 		src:  src,
 	}
-	v.v, v.r, v.m = -1, -1, -1
+	v.v, v.r, v.m, v.pre = -1, -1, -1, -1
 
 	base := src
 	//rc,betaを確認
@@ -61,11 +64,13 @@ func NewVersion(src string) *Version {
 	if idx != -1 {
 		v.mean = MeanRC
 		base = src[:idx]
+		v.pre = parsePreNumber(src[idx+len("rc"):])
 	} else {
 		idx = strings.Index(src, "beta")
 		if idx != -1 {
 			v.mean = MeanBeta
 			base = src[:idx]
+			v.pre = parsePreNumber(src[idx+len("beta"):])
 		}
 	}
 
@@ -99,6 +104,17 @@ func NewVersion(src string) *Version {
 	return v
 }
 
+// beta,rcに続く連番を数値化する
+//
+// 数値化できない場合は-1を返す
+func parsePreNumber(src string) int {
+	n, err := strconv.Atoi(src)
+	if err != nil {
+		return -1
+	}
+	return n
+}
+
 func (v Version) IsError() bool {
 	return v.mean == MeanError
 }
@@ -108,6 +124,12 @@ func (v Version) Stable() bool {
 }
 
 func (src Version) Compare(target *Version) int {
+
+	//両方エラーの場合に-1を返すと大小が矛盾する為、
+	//文字列で比較して順序を安定させる
+	if src.mean == MeanError && target.mean == MeanError {
+		return strings.Compare(src.src, target.src)
+	}
 
 	if src.mean == MeanError {
 		return -1
@@ -136,6 +158,13 @@ func (src Version) Compare(target *Version) int {
 	if src.mean > target.mean {
 		return 1
 	} else if src.mean < target.mean {
+		return -1
+	}
+
+	//beta,rcの連番は数値で比較する(beta9 < beta10)
+	if src.pre > target.pre {
+		return 1
+	} else if src.pre < target.pre {
 		return -1
 	}
 

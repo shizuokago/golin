@@ -34,3 +34,32 @@ func TestVersion(t *testing.T) {
 	}
 
 }
+
+// beta,rcの連番の並び順
+//
+// 文字列比較では beta10 < beta9 になってしまう
+func TestVersionPreNumber(t *testing.T) {
+
+	data := []struct {
+		small string
+		large string
+	}{
+		{"1.22beta9", "1.22beta10"},
+		{"1.22rc1", "1.22rc2"},
+		{"1.22rc9", "1.22rc10"},
+		{"1.22beta10", "1.22rc1"},
+		{"1.22rc10", "1.22"},
+		{"1.22beta2", "1.22.0"},
+	}
+
+	for _, d := range data {
+		s := golin.NewVersion(d.small)
+		l := golin.NewVersion(d.large)
+		if !s.Less(l) {
+			t.Errorf("Version less error. %s < %s", d.small, d.large)
+		}
+		if l.Less(s) {
+			t.Errorf("Version less error. %s > %s", d.large, d.small)
+		}
+	}
+}
