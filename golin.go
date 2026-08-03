@@ -236,7 +236,18 @@ func readyPath(dir, v string) (string, error) {
 // rename C:\Users\secon\sdk\go1.23.0\ D:\Go\Runtimes\1.23.0\: The system cannot move the file to a different disk drive.
 func copyDir(src, dst string) error {
 
-	os.Mkdir(dst, 0666)
+	//コピー元のパーミッションを引き継ぐ
+	//0666のような実行ビットのない値で作成すると
+	//Windows以外でディレクトリを辿れなくなる
+	info, err := os.Stat(src)
+	if err != nil {
+		return xerrors.Errorf("os.Stat() error: %w", err)
+	}
+
+	err = os.Mkdir(dst, info.Mode().Perm())
+	if err != nil && !os.IsExist(err) {
+		return xerrors.Errorf("os.Mkdir() error: %w", err)
+	}
 
 	entries, err := os.ReadDir(src)
 	if err != nil {
@@ -272,15 +283,29 @@ func copyFile(src, dst string) error {
 	}
 	defer fp.Close()
 
-	f, err := os.Create(dst)
+	//os.Create()は0666で作成する為、実行権限が落ちてしまう
+	//bin/go等が実行できなくなるのでコピー元のモードを引き継ぐ
+	info, err := fp.Stat()
 	if err != nil {
-		return xerrors.Errorf("os.Create() error: %w", err)
+		return xerrors.Errorf("os.File.Stat() error: %w", err)
+	}
+	perm := info.Mode().Perm()
+
+	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return xerrors.Errorf("os.OpenFile() error: %w", err)
 	}
 	defer f.Close()
 
 	_, err = io.Copy(f, fp)
 	if err != nil {
 		return xerrors.Errorf("io.Copy() error: %w", err)
+	}
+
+	//既存ファイルの場合OpenFile()のモードが効かない為、明示的に設定
+	err = os.Chmod(dst, perm)
+	if err != nil {
+		return xerrors.Errorf("os.Chmod() error: %w", err)
 	}
 
 	return nil
