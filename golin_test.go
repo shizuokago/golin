@@ -1,7 +1,6 @@
 package golin_test
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
@@ -113,73 +112,16 @@ func TestDownload(t *testing.T) {
 	}
 }
 
+// TODO(secondarykey): Create()のテストを復活させる
+//
+// 元のテストはgolin.DefaultOption()/SetOption()で標準入力を差し替えていたが、
+// これらのAPIは削除されており、現在getRoot()はos.Stdinを直接読む為、
+// GOROOTの確認プロンプトを抜けられない。
+// またGOROOTに実ディレクトリを設定していた為、readyLink()のos.Remove()が
+// 空でないディレクトリに対して失敗し、API以前に前提が壊れている。
+// 標準入力を注入できる形に戻すか、リンク名をテスト用に変更する必要がある。
 func TestCreate(t *testing.T) {
-
-	if testing.Short() {
-		t.Skip("skipping Create() test in short mode.")
-	}
-
-	sdk, err := golin.Download("1.12")
-	if err != nil {
-		t.Errorf("Downloaded version error[%v]", err)
-	}
-
-	//fakeの位置に移動
-	err = os.Rename(sdk+string(filepath.Separator), workROOT+string(filepath.Separator))
-	if err != nil {
-		t.Logf("Rename Error[%v]", err)
-	}
-
-	org := os.Getenv("GOROOT")
-	defer func(path string) {
-		err := os.Setenv("GOROOT", path)
-		if err != nil {
-			t.Logf("setenv error[%v]", err)
-		}
-	}(org)
-
-	err = os.Setenv("GOROOT", "")
-	if err != nil {
-		t.Logf("GOROOT set error")
-	}
-
-	op := golin.DefaultOption()
-	op.StdIn = bytes.NewBufferString("Y\n")
-	err = golin.Create("1.12")
-	if err == nil {
-		t.Errorf("GOROOT setting not error")
-	}
-
-	t.Logf("Work GOROOT[%s]", workROOT)
-	err = os.Setenv("GOROOT", workROOT)
-	if err != nil {
-		t.Logf("GOROOT set error")
-	}
-
-	op.StdIn = bytes.NewBufferString("Y\n")
-	golin.SetOption(op)
-	err = golin.Create("1.12")
-	if err != nil {
-		t.Errorf("Create 1.12[%v]", err)
-	}
-
-	//switch
-	op.StdIn = bytes.NewBufferString("Y\n")
-	golin.SetOption(op)
-	err = golin.Create("1.11")
-	if err != nil {
-		t.Errorf("Create 1.11[%v]", err)
-	}
-
-	//reswitch
-	op.StdIn = bytes.NewBufferString("Y\n")
-	golin.SetOption(op)
-	err = golin.Create("1.12")
-	if err != nil {
-		t.Errorf("Create(exist) 1.12[%v]", err)
-	}
-
-	//Set Option Operation Y
+	t.Skip("skipping Create() test: stdin injection API was removed.")
 }
 
 func BenchmarkParseVersion(b *testing.B) {
@@ -230,70 +172,11 @@ func BenchmarkSortVersion(b *testing.B) {
 	}
 }
 
-func ExamplePrint() {
-
-	err := golin.Print()
-	if err != nil {
-	}
-
-	// Output:
-	// 1.8beta1
-	// 1.8beta2
-	// 1.8rc1
-	// 1.8rc2
-	// 1.8rc3
-	// 1.8
-	// 1.8.1
-	// 1.8.2
-	// 1.8.3
-	// 1.8.4
-	// 1.8.5
-	// 1.8.6
-	// 1.8.7
-	// 1.9beta1
-	// 1.9beta2
-	// 1.9rc1
-	// 1.9rc2
-	// 1.9
-	// 1.9.1
-	// 1.9.2
-	// 1.9.3
-	// 1.9.4
-	// 1.9.5
-	// 1.9.6
-	// 1.9.7
-	// 1.10beta1
-	// 1.10beta2
-	// 1.10rc1
-	// 1.10rc2
-	// 1.10
-	// 1.10.1
-	// 1.10.2
-	// 1.10.3
-	// 1.10.4
-	// 1.10.5
-	// 1.10.6
-	// 1.10.7
-	// 1.10.8
-	// 1.11beta1
-	// 1.11beta2
-	// 1.11beta3
-	// 1.11rc1
-	// 1.11rc2
-	// 1.11
-	// 1.11.1
-	// 1.11.2
-	// 1.11.3
-	// 1.11.4
-	// 1.11.5
-	// 1.11.6
-	// 1.12beta1
-	// 1.12beta2
-	// 1.12rc1
-	// 1.12
-	// 1.12.1
-	//
-}
+// ExamplePrintは削除した
+//
+// golin.Print()は既に存在せず(現在はPrintGoVersionList(all bool))、
+// 期待値もGo1.12時点のバージョン一覧で固定されていた為、
+// go.dev/dlの内容に追従できずExampleとして成立しない。
 
 // Test getHome()
 // ユーザディレクトリの取得のメソッド
