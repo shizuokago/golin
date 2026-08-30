@@ -47,14 +47,14 @@ func Install(path string, ver string) error {
 		return xerrors.Errorf("readyLink() error: %w", err)
 	}
 
-	//シンボリックリンクを作成
-	err = os.Symlink(dp, link)
+	//リンクを作成
+	err = createLink(dp, link)
 	if err != nil {
 		//失敗するとGOROOTが存在しない状態になる為、元のリンクに戻す
 		if rerr := restore(); rerr != nil {
 			fmt.Fprintf(os.Stderr, "リンクの復元に失敗しました。: %v\n", rerr)
 		}
-		return xerrors.Errorf("symlink: %w", err)
+		return xerrors.Errorf("createLink: %w", err)
 	}
 
 	// 各OSに合わせた設定手順を表示

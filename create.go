@@ -44,14 +44,14 @@ func Create(v string) error {
 		return xerrors.Errorf("ready link: %w", err)
 	}
 
-	//シンボリックリンクを作成
-	err = os.Symlink(path, link)
+	//リンクを作成
+	err = createLink(path, link)
 	if err != nil {
 		//失敗するとGOROOTが存在しない状態になる為、元のリンクに戻す
 		if rerr := restore(); rerr != nil {
 			fmt.Fprintf(os.Stderr, "リンクの復元に失敗しました。: %v\n", rerr)
 		}
-		return xerrors.Errorf("symlink: %w", err)
+		return xerrors.Errorf("createLink: %w", err)
 	}
 
 	//終了したバージョンを作成

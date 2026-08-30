@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 {root}/current -> 1.22.0     # GOROOT points here
 ```
 
-Creating symlinks requires elevated privileges: Administrator command prompt on Windows, `sudo golin ...` on linux/mac (with `Defaults env_keep += "GOROOT"` in sudoers so `GOROOT` survives).
+On linux/mac the link is a symlink, so it needs `sudo golin ...` (with `Defaults env_keep += "GOROOT"` in sudoers so `GOROOT` survives). On Windows it is an NTFS junction, which needs no elevation — see "Link creation" below.
 
 ## Commands
 
@@ -46,7 +46,19 @@ Subcommand dispatch is a single switch in `_cmd/golin/main.go`; anything that is
 - `list.go` — grouping/printing of the version list by minor version; also cross-references versions already present on disk.
 - `compress.go` — zip/tar.gz decompression for `install`, and the zip creation used by the `compress` subcommand during release.
 - `config/` — process-global singleton (`config.Get()`) holding just `LinkName`, set once from the `-d` flag via functional options.
-- `golin_windows.go` / `golin_other.go` — the only OS-specific code: home dir env var (`USERPROFILE` vs `HOME`) and download extension (`zip` vs `tar.gz`).
+- `golin_windows.go` / `golin_other.go` — home dir env var (`USERPROFILE` vs `HOME`) and download extension (`zip` vs `tar.gz`).
+- `link_windows.go` / `link_other.go` — `createLink(target, link)`, the other OS-specific pair. See below.
+
+### Link creation
+
+Nothing outside `link_*.go` calls `os.Symlink`. `create.go`, `install.go`, `checkAuthorization`, and the `restore` closure in `readyLink` all go through `createLink`.
+
+On Windows `createLink` builds an NTFS junction — `os.Mkdir` an empty dir, then `DeviceIoControl(FSCTL_SET_REPARSE_POINT)` with an `IO_REPARSE_TAG_MOUNT_POINT` `REPARSE_DATA_BUFFER` — using only stdlib `syscall`, no `x/sys` dependency. A junction needs no `SeCreateSymbolicLinkPrivilege`, so version switching works from a normal prompt. It can only target a directory on a local volume, so if the reparse point can't be set (UNC, network drive) it falls back to `os.Symlink`, which does need elevation.
+
+Two consequences to keep in mind:
+
+- Go reports a junction from `os.Lstat` as `ModeIrregular`, **not** `ModeSymlink`. `os.Readlink` and `os.Remove` work on it normally (remove deletes only the junction), which is why `readyLink` needs no OS-specific branch — but any new `mode&os.ModeSymlink` check would silently miss junctions.
+- `restore` must use `createLink`, never `os.Symlink`. On an existing machine `current` is a real symlink created back when golin required Administrator. Deleting it needs no privilege, so an unelevated run gets as far as removing it; restoring with `os.Symlink` would then fail and leave `GOROOT` pointing at nothing. Replacing a symlink with a junction is a silent one-way migration, which is fine — the target is unchanged.
 
 ### Two different download mechanisms
 

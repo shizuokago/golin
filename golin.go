@@ -33,9 +33,9 @@ func checkAuthorization(path string) error {
 	defer os.Remove(work)
 
 	link := filepath.Join(path, "_"+workDirectory+"_")
-	err = os.Symlink(work, link)
+	err = createLink(work, link)
 	if err != nil {
-		return xerrors.Errorf("シンボリックリンクの作成に失敗しました。: %w", err)
+		return xerrors.Errorf("リンクの作成に失敗しました。: %w", err)
 	}
 	defer os.Remove(link)
 
@@ -193,10 +193,15 @@ func readyLink(dir string) (string, func() error, error) {
 	//symbliclink
 	if _, err := os.Lstat(link); err == nil {
 		//リンク先を保持しておく
-		//シンボリックリンク以外(通常のディレクトリ等)の場合は復元できない
+		//リンク以外(通常のディレクトリ等)の場合は復元できない
+		//
+		//既存のリンクがシンボリックリンクであっても
+		//復元はcreateLink()で行う為、Windowsでは管理者権限を必要としない
+		//(リンクの削除自体には権限が要らない為、
+		// os.Symlink()で復元すると権限がない環境でGOROOTを失う)
 		if org, lerr := os.Readlink(link); lerr == nil {
 			restore = func() error {
-				return os.Symlink(org, link)
+				return createLink(org, link)
 			}
 		}
 

@@ -116,10 +116,9 @@ func TestReadyLinkRestore(t *testing.T) {
 	}
 
 	link := filepath.Join(dir, config.Get().LinkName)
-	err = os.Symlink(org, link)
+	err = createLink(org, link)
 	if err != nil {
-		//Windowsでは管理者権限が必要な為、作成できない場合はスキップする
-		t.Skipf("skipping: symlink not available: %v", err)
+		t.Fatalf("createLink() error: %v", err)
 	}
 
 	got, restore, err := readyLink(dir)
@@ -141,6 +140,162 @@ func TestReadyLinkRestore(t *testing.T) {
 		t.Fatalf("restore() error: %v", err)
 	}
 	dst, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("os.Readlink() error: %v", err)
+	}
+	if dst != org {
+		t.Errorf("restored link = %s, want %s", dst, org)
+	}
+}
+
+// createLink()で作成したリンクがGOROOTとして扱えるかを確認する
+//
+// Windowsではシンボリックリンクではなくジャンクションを作成する為、
+// 参照先を辿れる事、リンク先が取得できる事、
+// 削除しても参照先が残る事を確認する
+func TestCreateLink(t *testing.T) {
+
+	dir := t.TempDir()
+
+	org := filepath.Join(dir, "1.24.0")
+	err := os.MkdirAll(filepath.Join(org, "bin"), 0755)
+	if err != nil {
+		t.Fatalf("os.MkdirAll() error: %v", err)
+	}
+	err = os.WriteFile(filepath.Join(org, "bin", "go"), []byte("binary"), 0755)
+	if err != nil {
+		t.Fatalf("os.WriteFile() error: %v", err)
+	}
+
+	link := filepath.Join(dir, config.Get().LinkName)
+	err = createLink(org, link)
+	if err != nil {
+		t.Fatalf("createLink() error: %v", err)
+	}
+
+	//リンクとして認識される事
+	if _, err := os.Lstat(link); err != nil {
+		t.Fatalf("os.Lstat() error: %v", err)
+	}
+
+	//リンク越しに参照先を読める事
+	data, err := os.ReadFile(filepath.Join(link, "bin", "go"))
+	if err != nil {
+		t.Fatalf("os.ReadFile() error: %v", err)
+	}
+	if string(data) != "binary" {
+		t.Errorf("content = %q, want %q", data, "binary")
+	}
+
+	//readyLink()が復元先を保持できる事
+	dst, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("os.Readlink() error: %v", err)
+	}
+	if dst != org {
+		t.Errorf("os.Readlink() = %s, want %s", dst, org)
+	}
+
+	//既に存在する場合は作成できず、既存のリンクを壊さない事
+	if err := createLink(org, link); err == nil {
+		t.Errorf("createLink() to existing path returns no error")
+	}
+	if _, err := os.Lstat(link); err != nil {
+		t.Errorf("existing link is broken: %v", err)
+	}
+
+	//リンクのみが削除され参照先が残る事
+	err = os.Remove(link)
+	if err != nil {
+		t.Fatalf("os.Remove() error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(org, "bin", "go")); err != nil {
+		t.Errorf("link target is removed: %v", err)
+	}
+}
+
+// 権限チェックが管理者権限なしで通るかを確認する
+//
+// リンクの作成をジャンクションに変更した為、
+// チェック側もシンボリックリンクで判定してはいけない
+func TestCheckAuthorization(t *testing.T) {
+
+	dir := t.TempDir()
+
+	err := checkAuthorization(dir)
+	if err != nil {
+		t.Fatalf("checkAuthorization() error: %v", err)
+	}
+
+	//確認用のディレクトリとリンクが残っていない事
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("os.ReadDir() error: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("work files are not removed: %v", entries)
+	}
+}
+
+// 既にシンボリックリンクが存在する環境を切り替えられるかを確認する
+//
+// Windowsでシンボリックリンクの作成には管理者権限が必要な為、
+// 権限のない環境でos.Symlink()による復元を行うとGOROOTを失う
+// 既存のリンクがシンボリックリンクでも復元はcreateLink()で行う
+func TestReadyLinkExistsSymlink(t *testing.T) {
+
+	dir := t.TempDir()
+
+	org := filepath.Join(dir, "1.24.0")
+	err := os.Mkdir(org, 0755)
+	if err != nil {
+		t.Fatalf("os.Mkdir() error: %v", err)
+	}
+
+	link := filepath.Join(dir, config.Get().LinkName)
+	err = os.Symlink(org, link)
+	if err != nil {
+		//権限がない場合、既存のシンボリックリンクを再現できない為スキップする
+		t.Skipf("skipping: symlink not available: %v", err)
+	}
+
+	//既存のシンボリックリンクを削除できる事
+	_, restore, err := readyLink(dir)
+	if err != nil {
+		t.Fatalf("readyLink() error: %v", err)
+	}
+	if _, err := os.Lstat(link); err == nil {
+		t.Fatalf("link is not removed")
+	}
+
+	//新しいバージョンへ張り替えられる事
+	next := filepath.Join(dir, "1.25.0")
+	err = os.Mkdir(next, 0755)
+	if err != nil {
+		t.Fatalf("os.Mkdir() error: %v", err)
+	}
+	err = createLink(next, link)
+	if err != nil {
+		t.Fatalf("createLink() error: %v", err)
+	}
+	dst, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("os.Readlink() error: %v", err)
+	}
+	if dst != next {
+		t.Errorf("link = %s, want %s", dst, next)
+	}
+
+	//失敗時に元のシンボリックリンク先へ戻せる事
+	err = os.Remove(link)
+	if err != nil {
+		t.Fatalf("os.Remove() error: %v", err)
+	}
+	err = restore()
+	if err != nil {
+		t.Fatalf("restore() error: %v", err)
+	}
+	dst, err = os.Readlink(link)
 	if err != nil {
 		t.Fatalf("os.Readlink() error: %v", err)
 	}

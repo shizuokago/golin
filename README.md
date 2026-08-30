@@ -120,13 +120,20 @@ golin自体のバージョンを表示します。
 
 # super user
 
-It can only be executed by superuser.(symbolic link create)
-
 ## windows
 
-Please execute command prompt as Administrators.
+Administrator privileges are not required.
+
+golin creates a junction instead of a symbolic link, so it works from a normal command prompt.
+Existing environments that already have a symbolic link are also supported: the link is replaced
+with a junction the next time you switch versions, and the link target does not change.
+
+A junction can only point at a directory on a local volume. If the Go SDK root is on a network
+drive or a UNC path, golin falls back to a symbolic link and Administrator privileges are required.
 
 ## other(linux or mac)
+
+It can only be executed by superuser.(symbolic link create)
 
 ```
 sudo golin {version}
